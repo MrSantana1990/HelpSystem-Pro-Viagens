@@ -1,33 +1,45 @@
-# Implantação — Fase 1 exclusivamente local
+# Implantação — staging privado
 
-## Desenvolvimento
+## Estado Git e fluxo
+
+PR #1 integrado em main, PR #2 retargetado para main, atualizado sem mudança funcional e integrado após CI verde. Branch desta fase descende de main com ambas as fases completas.
+
+Push em main → Quality → imagens por SHA → Environment staging → SSH restrito → deploy → smoke. Durante o bootstrap, agent/staging-provisioning-cd possui a mesma autorização explícita. PRs executam Quality sem receber secrets/deploy. Nenhum fluxo de produção habilitado. Após integrar a fase, retirar a exceção de bootstrap do workflow, Environment e verificador remoto.
+
+Quality inclui format/lint/TypeScript, testes de domínio/API, PostgreSQL real, autorização, browser desktop/mobile, restore, audit, build Docker e testes da fronteira de deploy. Imagens são artefatos por SHA, retenção sete dias, sem secrets. O servidor também consulta o job Quality do workflow ci.yml para o commit.
+
+## Provisionamento administrativo
+
+Revalidar recursos, porta 18094 e ausência de colisões. Revisar infra/staging e executar como administrador:
 
 ```sh
-npm ci
-npm run local:setup
-npm run local:up
+bash infra/staging/provision.sh /caminho/do/checkout-revisado /caminho/deploy.pub /caminho/access.pub
 ```
 
-Abre http://localhost:8094. O script cria configuração privada somente se ausente, constrói web/API/migrate, inicia PostgreSQL, gera pg_dump pré-migration, aplica migrations com viagens_migrator e inicia API/web com health checks. Migration não roda dentro do processo runtime.
+Script idempotente preserva runtime.env, CA, conta de smoke e repositório existentes. Atualiza somente arquivos operacionais próprios sob root. Não adiciona deploy user ao grupo Docker, não modifica daemon Docker/SSH, Nginx global ou Cloudflare.
 
-A API exige banco e recusa role privilegiada, schema incompleto ou RLS inválido. Não usar docker compose up em um banco novo sem aplicar migrations. O banco principal não publica porta no host.
+O manifesto de migrations aprovado deve corresponder ao SQL revisado. Novas migrations exigem revisão expand/contract e atualização administrativa deliberada. Não rodar provisionamento novo apenas para contornar rejeição do manifesto.
 
-Parar sem excluir dados: docker compose --env-file .env -f infra/compose.yml stop. Nunca usar down -v no projeto principal por rotina.
+## Deploy
 
-## Testes
+O CI constrói API/web; empacota duas imagens rotuladas; envia a infra/deploy.sh. O helper /usr/local/sbin/viagens-staging-deploy valida SHA, Quality e pacote, cria worktree e inicia somente viagens-staging com o Compose root-owned.
 
-npm run test:system usa projeto/volumes descartáveis com nome viagens-phase1-test-PID. Executa migração idempotente, runtime/ownership, navegador e restore em novo banco temporário; remove apenas esses recursos no finally. Scripts rejeitam alvo de restore que não pertença ao projeto de teste. A porta loopback adicional do PostgreSQL só existe em infra/compose.test.yml.
+Sequência: validar → carregar imagens → PostgreSQL saudável → backup pré-migration → migration separada → API/web → readiness HTTPS → smoke autenticado → current. Um erro de migration interrompe antes da troca da aplicação. Falha de health/smoke tenta código anterior e revalida health/smoke; dados e volumes permanecem.
 
-## CI e revisão
+Arquivos operacionais não são atualizados automaticamente a partir de release. Mudança de Compose/helper requer revisão administrativa; alteração apenas de código da aplicação segue CD normal.
 
-Quality roda npm ci, check, npm audit, Docker build, PostgreSQL real, navegador e backup/restore. Evidência sanitizada e build web são artefatos; .env e dumps não são enviados.
+## Acesso privado
 
-O PR de Fase 0 ainda não estava mesclado ao começar. A Fase 1 é uma branch descendente de 4008e96 e seu PR deve ter a branch da Fase 0 como base enquanto o PR #1 estiver aberto. Depois da revisão/merge da base, atualizar a base do PR para main. Nenhum merge automático.
+```sh
+ssh -N -L 127.0.0.1:18094:127.0.0.1:18094 viagens-staging
+```
 
-## CD compartilhado permanece bloqueado
+Alias local configurado com a chave exclusiva viagens_staging_access. Acessar https://localhost:18094 e confiar somente na CA privada obtida pelo canal SSH autenticado. Não usar exceção global de TLS. API exige HTTPS e cookies Secure; a conta da aplicação continua obrigatória.
 
-Fluxo por SHA/worktree preservado. Além de DEPLOY_ENABLED, a chamada exige PERSISTENCE_DEPLOY_READY=true. Nenhuma dessas flags foi habilitada; staging não foi provisionado, nem VPS/DNS/Cloudflare alterados.
+A chave de acesso não executa comandos. Encaminhamento permitido somente para a porta exclusiva; autorização de reverse bind também limitada à mesma porta já ocupada pelo staging. Chave de deploy não permite forwarding.
 
-A próxima fase deve preparar o deploy persistente: backup pré-migration verificado, execução DDL separada, health de dependências, rollback compatível com schema e teste de restore. O script de deploy herdado da Fase 0 não aplica essas migrations; não habilitar o gate para contorná-lo.
+## Desenvolvimento local
 
-Antes de ativar staging: destino offsite autenticado, usuário de deploy restrito, secrets próprios, revisão de capacidades/portas, ambiente GitHub com controle de publicação, trustProxy e HTTPS validados. Alvos de RPO 24h/RTO 4h não estão comprovados por um teste pequeno local.
+npm run local:setup e npm run local:up continuam disponíveis em http://localhost:8094, sem modificar o banco local existente. Testes usam projetos descartáveis próprios. Staging usa infra/staging/compose.yml, não o Compose local.
+
+O pacote é vinculado criptograficamente ao SHA-256 registrado no nome do artefato do job Quality no GitHub, consultado pelo servidor via HTTPS. A validação não depende apenas de tags/labels fornecidas pelo cliente de deploy.

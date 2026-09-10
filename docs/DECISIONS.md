@@ -6,3 +6,5 @@
 - [ADR 004 — identidade, runtime PostgreSQL e backup](adr/004-runtime-identity-and-backup.md)
 
 ADRs aceitos para o bootstrap. Domínio é proposta auditada, sem mudança DNS. Aprovação de fornecedores e autenticação de usuários continuam etapas próprias.
+
+- [ADR 005 — staging privado e recuperação](adr/005-private-staging-and-recovery.md)

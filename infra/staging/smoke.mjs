@@ -17,9 +17,13 @@ async function call(path, method = 'GET', data) {
         ca: smokeConfig.ca,
         headers: {
           origin,
-          'content-type': 'application/json',
           cookie,
-          ...(body ? { 'content-length': Buffer.byteLength(body) } : {}),
+          ...(body
+            ? {
+                'content-type': 'application/json',
+                'content-length': Buffer.byteLength(body),
+              }
+            : {}),
           ...(csrf ? { 'x-csrf-token': csrf } : {}),
         },
       },

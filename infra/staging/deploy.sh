@@ -39,7 +39,7 @@ if [[ -L "$base/current" ]]; then previous=$(basename "$(readlink -f "$base/curr
 "${compose[@]}" run --rm --no-deps migrate
 healthy() {
   for attempt in $(seq 1 30); do
-    if curl --silent --fail --cacert "$base/tls/ca.crt" https://localhost:18094/health/ready > "$base/logs/ready.json"; then
+    if curl --silent --fail --cacert "$base/tls/ca.crt" -D "$base/logs/ready.headers" https://localhost:18094/health/ready > "$base/logs/ready.json" && grep -qi "^x-release-sha: $RELEASE_SHA" "$base/logs/ready.headers"; then
       return 0
     fi
     sleep 2
@@ -61,7 +61,7 @@ if activate; then
 else success=false
 fi
 if [[ "$success" = true ]]; then
-  ln -s "$release" "$base/current.next"
+  ln -sfn "$release" "$base/current.next"
   mv -Tf "$base/current.next" "$base/current"
   if [[ -n "$previous" && "$previous" != "$revision" ]]; then printf '%s\n' "$previous" > "$base/previous-sha"; fi
   printf '{"event":"deployed","sha":"%s","seconds":%s}\n' "$revision" "$(( $(date +%s)-started ))"
@@ -71,6 +71,8 @@ else
     activate
     /usr/local/sbin/viagens-staging-smoke
     printf '{"event":"rollback","from":"%s","to":"%s","seconds":%s,"health":"ok"}\n' "$revision" "$previous" "$(( $(date +%s)-started ))"
+  else
+    "${compose[@]}" stop api web
   fi
   exit 1
 fi

@@ -56,3 +56,25 @@ class ArchiveBoundary(unittest.TestCase):
     def test_invalid_revision_rejected(self):
         with self.assertRaises(ValueError):
             guard.validate('unused', '../../other-product')
+
+    def test_foreign_oci_name_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.archive(directory)
+            with tarfile.open(path, 'a') as tar:
+                data = json.dumps({'manifests':[{'annotations':{'io.containerd.image.name':'docker.io/library/other-product:latest'}}]}).encode()
+                member = tarfile.TarInfo('index.json')
+                member.size = len(data)
+                tar.addfile(member, io.BytesIO(data))
+            with self.assertRaises(ValueError):
+                guard.validate(path, sha)
+
+    def test_symlink_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.archive(directory)
+            with tarfile.open(path, 'a') as tar:
+                member = tarfile.TarInfo('escape')
+                member.type = tarfile.SYMTYPE
+                member.linkname = '/etc/passwd'
+                tar.addfile(member)
+            with self.assertRaises(ValueError):
+                guard.validate(path, sha)

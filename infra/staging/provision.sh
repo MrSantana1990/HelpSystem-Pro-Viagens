@@ -80,5 +80,16 @@ Persistent=true
 WantedBy=timers.target
 UNIT
 systemctl daemon-reload
+cat > /etc/logrotate.d/viagens-staging <<'ROTATION'
+/opt/projetos/helpsystempro-viagens/staging/logs/*.log {
+  daily
+  rotate 14
+  compress
+  missingok
+  notifempty
+  copytruncate
+  su root root
+}
+ROTATION
 # Enable timer only after initial deployment has created PostgreSQL.
 echo 'Staging provisioned; deploy and enable viagens-staging-backup.timer next.'

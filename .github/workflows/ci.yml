@@ -24,7 +24,7 @@ jobs:
       - name: Deployment boundary tests
         run: |
           python3 -m unittest discover -s tests/deploy -p 'test_*.py'
-          bash -n infra/staging/*.sh
+          for file in infra/staging/*.sh infra/deploy.sh; do bash -n "$file"; done
       - name: Browser runtime
         run: npx playwright install --with-deps chromium
       - name: Isolated runtime, ownership, browser and backup/restore

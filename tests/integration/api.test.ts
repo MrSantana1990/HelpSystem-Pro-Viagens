@@ -17,8 +17,8 @@ it('serves health and analyzes a month through HTTP with server correlation IDs'
   const app = await buildApp(false);
   try {
     const health = await app.inject('/health/ready');
-    expect(health.statusCode).toBe(200);
-    expect(health.json().dependencies.database).toBe('not-used');
+    expect(health.statusCode).toBe(503);
+    expect(health.json().dependencies.database).toBe('unavailable');
     const response = await app.inject({
       method: 'POST',
       url: '/v1/search/month',

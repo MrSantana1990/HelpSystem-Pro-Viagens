@@ -23,10 +23,16 @@
     "test:integration": "vitest run tests/integration",
     "db:migrate": "tsx packages/database/src/migrate.ts",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
-    "test:database": "tsx tests/database.integration.ts",
-    "test:browser": "playwright test"
+    "test:database": "node scripts/test-database.mjs",
+    "test:browser": "playwright test",
+    "local:setup": "node scripts/local.mjs setup",
+    "local:up": "node scripts/local.mjs up",
+    "backup": "node scripts/local.mjs backup",
+    "test:system": "node scripts/test-system.mjs",
+    "test:restore": "tsx scripts/restore-proof.ts"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.1.2",
     "@fastify/rate-limit": "^10.3.0",
     "fastify": "^5.6.0",
     "pg": "^8.16.0",

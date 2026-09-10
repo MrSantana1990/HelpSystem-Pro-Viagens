@@ -1,14 +1,37 @@
-# Segurança
+# Segurança — identidade e persistência local
 
-- Repositório público. .env, logs, dumps, chaves e contextos privados ignorados; nunca copiar manual de continuidade.
-- API demo sem persistência ou painel administrativo. Não recebe e-mail, documento ou credencial do usuário.
-- Validar DTO strict, tamanho de body, números inteiros e limites de entradas. IDs de correlação gerados no servidor.
-- Logs estruturados sem body; cookies/autorização e campos sensíveis redigidos. Erros não retornam stack ou detalhes internos.
-- Rate limit por conexão/IP sem confiar em cabeçalhos de proxy arbitrários. Atrás de Nginx, limite atual é agregado; revisar trustProxy/IP do Tunnel de forma restrita antes de tráfego público.
-- API/dados em rede interna; host publica somente web em loopback. Runtime não-root, no-new-privileges e recursos limitados.
-- Autenticação futura própria com hash forte, sessão expirada/revogável, cookie HttpOnly/Secure/SameSite e proteção CSRF. Não depender de Cloudflare Access conforme padrão existente.
-- tenant_id e owner_id obrigatórios; RLS com FORCE em trip_plans. Superusuários PostgreSQL ignoram RLS: runtime deverá usar role não-superusuária separada da migration. API não conecta ao banco nesta fase.
-- Nenhum envio de e-mail, compra, reserva ou scraping automático. Adapters reais devem conferir domínios de fornecedores e não aceitar URLs arbitrárias.
-- PWA futura não poderá cachear responses autenticadas, tokens ou dados pessoais; logout deve limpar dados offline.
-- Dependências travadas no package-lock e audit em CI. Revisar pinning de actions/imagens por SHA/digest antes da ativação pública.
-- Antes de coleta real: políticas de retenção/exclusão, consentimento, controle por usuário e revisão dos termos dos fornecedores. A fundação não equivale a certificação jurídica ou produto pronto para dados pessoais.
+## Senhas e enumeração
+
+Scrypt assíncrono N=131072/r=8/p=1, salts aleatórios de 16 bytes, chave derivada de 64 bytes e formato versionado. Cadastro aceita 12–128 caracteres; sem senha padrão. Duas derivações simultâneas no máximo, com rejeição 503 sob saturação para proteger memória. Login desconhecido executa o mesmo KDF e retorna a mesma resposta de senha errada. Cadastro novo e duplicado retornam o mesmo 202, sem cookie automático.
+
+Cadastro limitado a cinco tentativas/15 min/IP; login a dez/15 min/IP; buscas a 30/min. Não confiar em X-Forwarded-For arbitrário. Limites em memória por processo e agregados atrás de Nginx; proxy confiável e defesa distribuída precisam revisão antes de uso público.
+
+## Sessões e CSRF
+
+Token opaco aleatório de 256 bits no cookie; banco guarda apenas SHA-256. Validade absoluta de oito horas pelo relógio do PostgreSQL. Login rotaciona token e revoga sessão anterior apresentada; logout revoga no banco, limpa cookie e estado privado da UI. Cookies HttpOnly, SameSite=Lax, Path=/; não-local exige HTTPS, Secure e prefixo __Host-. Sem Domain.
+
+Mutação privada exige token CSRF derivado por HMAC do segredo da sessão mais Origin exato permitido. Token fica apenas em memória no navegador. Login/cadastro exigem Origin válido e contrato JSON. Sem CORS permissivo, localStorage de tokens, Cloudflare Access ou login social. Sessão revogada/expirada responde 401 e não executa operação privada.
+
+## Banco e autorização
+
+API recebe exclusivamente viagens_runtime. Essa role não possui SUPERUSER, BYPASSRLS, CREATEDB, CREATEROLE, DDL, ownership das tabelas nem membership da role migrator. Startup/readiness verificam role, schema e RLS/FORCE RLS.
+
+Schema identity não é acessível diretamente ao runtime. Funções SECURITY DEFINER possuem search_path fixo, objetos qualificados e EXECUTE restrito. Autenticação verifica senha antes de emitir sessão. O serviço runtime é a fronteira confiável para resolver identidade; RLS não pretende proteger contra comprometimento completo dessa identidade técnica.
+
+Planos/cenários usam transação com set_config(...,true) para tenant_id/user_id obtidos da sessão. API confere ownership e banco aplica RLS. Nenhuma decisão usa tenant/owner enviado pelo cliente. FK composta preserva trip/tenant/owner. Respostas de recurso alheio e inexistente são 404 idênticos em código/mensagem; correlation ID aleatório não identifica proprietário.
+
+## HTTP, conteúdo e logs
+
+Zod strict, UUIDs, datas reais, quantidades e centavos inteiros. Resultados financeiros/proveniência são recalculados, não aceitos do cliente. Body máximo 16 KiB. Queries parametrizadas; nomes dinâmicos em scripts operacionais vêm de allowlists.
+
+React escapa títulos/conteúdo; sem HTML arbitrário. Nginx mantém CSP, nosniff, Referrer-Policy e bloqueio de frames. API usa no-store e correlation ID. Logs JSON e duração de requisição mantidos; não registrar senha, hashes, sessão, CSRF, autorização, body, URL de conexão ou dados privados desnecessários. Erros públicos genéricos sem SQL/stack.
+
+## Operação e gates
+
+PostgreSQL/Redis sem porta pública, API em rede interna; somente web em loopback. Aplicação não-root; limites de memória e logs. Redis/worker não são iniciados sem necessidade.
+
+Backups contêm dados sensíveis: diretório 700, dumps/checksums 600, volume isolado. Restore permitido somente em banco descartável recém-criado no projeto de teste. Offsite autenticado, retenção real e ensaio operacional com volume representativo são gates para staging/persistência compartilhada. pg_dump não inclui roles: recriá-las pelo provisionamento antes de restaurar em cluster novo.
+
+Sem verificação de e-mail, recuperação de conta, troca de senha ou gestão B2B nesta fase. Nenhuma integração comercial, compra, e-mail, PWA offline, DNS ou produção. Branch e PR sujeitos à revisão.
+
+A matriz de testes e os resultados reais estão em [VALIDATION](VALIDATION.md); critérios e fontes da decisão em [ADR 004](adr/004-runtime-identity-and-backup.md).

@@ -6,17 +6,51 @@ x-runtime: &runtime
     driver: json-file
     options: { max-size: '10m', max-file: '3' }
 services:
+  postgres:
+    <<: *runtime
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: viagens
+      POSTGRES_USER: viagens_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run npm run local:setup}
+      MIGRATION_PASSWORD: ${MIGRATION_PASSWORD:?Run npm run local:setup}
+      RUNTIME_PASSWORD: ${RUNTIME_PASSWORD:?Run npm run local:setup}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - backup_data:/backups
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/010-roles.sh:ro
+      - ./backup.sh:/operations/backup.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U viagens_admin -d viagens']
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    mem_limit: 512m
+    networks: [private]
+  migrate:
+    profiles: [tools]
+    build: { context: .., dockerfile: infra/Dockerfile.api }
+    command: ['node', 'dist/packages/database/src/migrate.js']
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://viagens_migrator:${MIGRATION_PASSWORD}@postgres:5432/viagens
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [private]
   api:
     <<: *runtime
     build: { context: .., dockerfile: infra/Dockerfile.api }
     environment:
       APP_ENV: ${APP_ENV:-local}
       PROVIDER_MODE: demo
+      DATABASE_URL: postgresql://viagens_runtime:${RUNTIME_PASSWORD}@postgres:5432/viagens
+      APP_ORIGINS: ${APP_ORIGINS:-http://localhost:8094,http://127.0.0.1:8094}
+    depends_on:
+      postgres: { condition: service_healthy }
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
-    mem_limit: 256m
-    cpus: 0.5
+    mem_limit: 512m
+    cpus: 1
     networks: [private]
   web:
     <<: *runtime
@@ -30,25 +64,9 @@ services:
     mem_limit: 128m
     cpus: 0.5
     networks: [private, edge]
-  postgres:
-    <<: *runtime
-    profiles: [data]
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: viagens
-      POSTGRES_USER: viagens
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
-    volumes: [postgres_data:/var/lib/postgresql/data]
-    healthcheck:
-      test: [CMD-SHELL, 'pg_isready -U viagens -d viagens']
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    mem_limit: 512m
-    networks: [private]
   redis:
     <<: *runtime
-    profiles: [data]
+    profiles: [future-redis]
     image: redis:7.4-alpine
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
@@ -58,15 +76,6 @@ services:
         -ec,
         'test -n "$$REDIS_PASSWORD"; exec redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory 96mb --maxmemory-policy allkeys-lru',
       ]
-    healthcheck:
-      test:
-        [
-          CMD-SHELL,
-          'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG',
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 10
     mem_limit: 128m
     networks: [private]
 networks:
@@ -74,3 +83,4 @@ networks:
   edge: {}
 volumes:
   postgres_data: {}
+  backup_data: {}

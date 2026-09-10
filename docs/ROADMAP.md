@@ -1,29 +1,27 @@
 # Roadmap técnico
 
-## Fase 0 — Auditoria e bootstrap (esta entrega)
+## Fase 0 — Fundação aprovada
 
-Inventário/ADRs/docs, app demo responsivo, providers desacoplados, engine testado, API validada, schema inicial e CI/CD preparado. Aceite: instalar pelo lockfile, check verde, demo utilizável, valores simulados explícitos e nenhuma alteração na produção existente.
+Auditoria, arquitetura/ADRs, app demo responsivo, providers desacoplados, Travel Engine testado, API e CI/CD preparado. Commit base 4008e96; preservado nesta evolução.
 
-## Fase 1 — Persistência e staging privado
+## Fase 1 — Runtime Persistence & Identity
 
-Autenticação própria, usuário/membership, role PostgreSQL de runtime sem bypass RLS, CRUD de planos e comparação de até três cenários persistidos. Testar CSRF, logout, sessão expirada e autorização cruzada. Revalidar capacidade VPS; provisionar staging isolado com backup/restore ensaiado e secrets mínimos. Aceite: usuário A não lê nem grava plano de B; edição mantém semântica dos custos; staging/rollback rastreáveis.
+Identidade/sessões próprias no PostgreSQL; runtime não privilegiado; RLS ligado à identidade; CRUD/duplicação de planos e cenários; comparação de até três; backup/restore descartável; testes de autorização, segurança e navegador. Escopo exclusivamente local. Evidências em VALIDATION.md.
 
-## Fase 2 — Primeiro inventário real
+Não inclui staging, providers comerciais, e-mail, alertas, PWA offline, organizações ou billing.
 
-Escolher parceiro após elegibilidade comercial, quota, orçamento e termos de cache/afiliado. Integrar um FlightProvider e um HotelProvider reais, sandbox/contrato, resultados ausentes/parciais, timeout, retry limitado e cache com proveniência/expiração. Separar simulação de preço real no contrato/UI. Aceite: um itinerário revalidado na fonte, custos completos rastreáveis e nenhuma promessa de reserva. Mapas só se manual não for suficiente.
+## Próxima fase — Staging Provisioning & CD
 
-## Fase 3 — Planejamento e compartilhamento
+1. Resolver destino offsite autenticado e retenção; ensaiar restauração representativa com roles separadas.
+2. Provisionar staging isolado, credencial de deploy restrita e secrets/environment próprios.
+3. Adaptar deploy por SHA para backup verificado e migration separada do runtime; rollback compatível.
+4. Revalidar capacidade/portas, origem HTTPS, cookie Secure, política de proxy confiável, health e ausência de impacto nos produtos existentes.
+5. Somente após evidência, habilitar DEPLOY_ENABLED e PERSISTENCE_DEPLOY_READY. Mudanças DNS/publicação têm escopo específico.
 
-Itinerário, comparação lado a lado, salvar versões, exportação e e-mail após comando explícito. Remetente verificado e opt-in; fila idempotente, retries, timeout, DLQ e heartbeat. Aceite: entrega rastreável sem duplicação, falha recuperável e exclusão do plano.
+## Depois do staging — Inventário real
 
-## Fase 4 — Alertas, PWA e inteligência
+Validar elegibilidade/contrato/quota de um parceiro de voos e um de hotéis. Implementar adapters, sandbox, expiração/proveniência, ausências e revalidação. Manter diferença visível entre DEMO, INDICATIVE e LIVE. Não reescrever Cost/Score por causa de um fornecedor.
 
-PWA instalável, app shell offline com proteção de dados, alertas autorizados, disponibilidade/flexibilidade, preferências e Score multidimensional calibrado. Aceite: stale prices visíveis, logout limpa armazenamento, alertas respeitam opt-out e critérios, score explica pesos e ausência de dados.
+## Evoluções posteriores
 
-## Fase 5 — B2B e operação comercial
-
-Organizações, convites, papéis, auditoria, quotas, cobrança se aprovada, isolamento verificado e métricas de valor: precisão de custo total, tempo até decisão, plano executado e feedback. Só expandir após demonstrar utilidade da experiência principal.
-
-## Próximo estágio concreto
-
-Finalizar revisão do bootstrap e provisionar staging privado. Em paralelo, validar elegibilidade dos fornecedores; esse acesso é bloqueio real para preços ao vivo, não para a engenharia da aplicação.
+Planejamento avançado/compartilhamento solicitado; e-mail idempotente; alertas com opt-in, retries e heartbeat; PWA com proteção de dados; Score multidimensional explicado e calibrado. B2B somente após utilidade comprovada, com membership, roles e isolamento testado. Nenhuma dessas etapas é requisito para encerrar a Fase 1 local.

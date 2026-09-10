@@ -1,0 +1,4 @@
+services:
+  postgres:
+    ports: ['127.0.0.1:15495:5432']
+    networks: [private, edge]

@@ -2,7 +2,7 @@
 
 ## Decisão após auditoria
 
-Monorepo npm workspaces, TypeScript strict, React/Vite/Tailwind, API Fastify em Node 22. PostgreSQL 16 e Redis 7.4 alinhados à infraestrutura existente, provisionados separadamente e opcionais enquanto a aplicação não persiste dados. shadcn/ui entra quando os componentes exigirem, sem infraestrutura vazia.
+Monorepo npm workspaces, TypeScript strict, React/Vite/Tailwind, API Fastify em Node 22. Na Fase 1, PostgreSQL 16 é dependência obrigatória de identidade e persistência. Redis 7.4 continua previsto, mas não é iniciado: sessões residem no PostgreSQL. shadcn/ui entra quando os componentes exigirem, sem infraestrutura vazia.
 
 ```text
 Navegador → Nginx web → API /v1
@@ -14,7 +14,8 @@ Navegador → Nginx web → API /v1
            FlightProvider   HotelProvider
                demo              demo
 
-Futuro: API → PostgreSQL isolado
+Atual: API → PostgreSQL isolado (sessões, usuários, planos, cenários)
+Futuro:
         API → Redis/filas → worker → EmailProvider
         MapsProvider → estimativas de deslocamento
 Borda alvo: Cloudflare Tunnel → 127.0.0.1:porta-web
@@ -49,3 +50,17 @@ Providers demo não fazem rede. Interface recebe AbortSignal; adapters reais dev
 ## Evolução
 
 Separar cache de inventário de snapshots salvos; TTL por contrato comercial. Chave de cache deve incluir moeda, rota, datas, passageiros e ocupação. Fila com tentativas limitadas, idempotência, DLQ e métricas de progresso. Providers reais podem retornar sem disponibilidade: nunca converter ausência de resultado em custo zero. Viagens B2B requer organização, membership/roles e testes completos; tenant_id/RLS inicial não constitui produto B2B pronto.
+
+## Identidade e persistência — Fase 1
+
+Cadastro/login/logout/session em /v1/auth. Cadastro cria partição pessoal interna (tenant_id=user.id), sem organização ou RBAC. Cookie de sessão opaco, hash no PostgreSQL e CSRF vinculado ao segredo; detalhes no ADR 004.
+
+Planos em /v1/trips: POST, GET paginado em lotes de 50, GET/PATCH/DELETE por UUID e POST /:tripId/duplicate. Cenários em /:tripId/scenarios: POST e GET/PATCH/DELETE por UUID. POST /:tripId/compare aceita entre um e três IDs distintos, todos do mesmo plano autenticado. Até 20 snapshots por plano; plano vazio pode ser salvo antes da primeira análise.
+
+Fluxo obrigatório: cookie → sessão válida no PostgreSQL → Identity do servidor → autorização API → transação → set_config local de tenant/user → RLS/FORCE RLS. Parâmetros de usuário não definem contexto. Pool não conserva identidade após commit/rollback; conexão com rollback falho é descartada.
+
+Roles: admin apenas bootstrap/backup, migrator owner/DDL, runtime sem privilégios administrativos ou bypass. Startup/readiness recusam role errada, membership migrator, schema incompleto e políticas desabilitadas. Schema identity fechado ao runtime; funções definer estreitas resolvem autenticação sem conceder leitura ampla das tabelas de usuários/sessões.
+
+trip_scenarios possui FK composta para trip_id/tenant_id/owner_id. Guarda input e snapshot imutável até edição explícita, com sourceType, provider, observedAt, expiresAt e currency. A API só grava DEMO/BRL, usando o engine existente. Duplicação cria novos UUIDs em transação e preserva valores/proveniência das cópias. Alterar o input do plano não muda snapshots antigos.
+
+Frontend mantém a experiência de planejamento e acrescenta conta/minhas viagens. Tokens ficam somente em cookie HttpOnly/memória, nunca localStorage; troca/expiração de sessão limpa conteúdo privado. Detalhes de backup/restore estão em OPERATIONS; staging não faz parte desta fase.

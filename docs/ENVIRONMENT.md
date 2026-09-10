@@ -1,39 +1,37 @@
-# Ambientes e credenciais
+# Ambientes e credenciais — Fase 1 local
 
-## Configuração
+## Configuração real
 
-| Variável             | Uso                            | Valor/padrão                        |
-| -------------------- | ------------------------------ | ----------------------------------- |
-| APP_ENV              | Ambiente                       | local, staging ou production        |
-| HOST / PORT          | Escuta API fora de Docker      | 127.0.0.1 / 3001                    |
-| PROVIDER_MODE        | Inventário                     | somente demo é aceito               |
-| COMPOSE_PROJECT_NAME | Isolamento de serviços/volumes | viagens-local                       |
-| WEB_PORT             | Porta loopback do frontend     | 8094                                |
-| POSTGRES_PASSWORD    | Perfil data opcional           | aleatória, exclusiva; não vazia     |
-| REDIS_PASSWORD       | Perfil data opcional           | aleatória, distinta; não vazia      |
-| DATABASE_URL         | Migration/teste PostgreSQL     | URL privada com valores URI encoded |
+npm run local:setup gera .env apenas se ausente, com três senhas criptograficamente aleatórias independentes. Não sobrescreve configuração existente. Linux: modo 600; Windows: ACL somente para o usuário atual. Nunca imprimir .env, strings de conexão ou Compose expandido com secrets.
 
-`npm run dev` não carrega .env automaticamente; padrões bastam no demo. Para API compilada, exporte variáveis no processo ou use `node --env-file=.env dist/apps/api/src/server.js`. Compose: `docker compose --env-file .env -f infra/compose.yml ...`. Nunca use `config` sem `--quiet` com secrets reais.
+| Variável               | Responsabilidade                                              |
+| ---------------------- | ------------------------------------------------------------- |
+| POSTGRES_PASSWORD      | Bootstrap/admin local e backup; nunca na API                  |
+| MIGRATION_PASSWORD     | Role viagens_migrator; apenas migration                       |
+| RUNTIME_PASSWORD       | Role viagens_runtime; somente DML/autenticação/RLS            |
+| DATABASE_URL           | Conexão runtime; injetada por Compose no serviço API          |
+| MIGRATION_DATABASE_URL | Conexão DDL; injetada somente no serviço migrate              |
+| APP_ENV                | local, staging, production; esta fase executa somente local   |
+| APP_ORIGINS            | Lista explícita de origens completas; sem wildcard            |
+| HOST/PORT              | API nativa; padrão loopback:3001, Docker 0.0.0.0:3001 interno |
+| WEB_PORT               | Host loopback, 8094 no desenvolvimento                        |
+| PROVIDER_MODE          | Somente demo                                                  |
+| REDIS_PASSWORD         | Apenas perfil futuro; Redis não usado por sessões             |
 
-Templates em infra/environments. Staging sugerido 18094; production 8094. Portas ainda precisam de revalidação no provisionamento. PostgreSQL e Redis não publicam portas no Compose.
+Senhas geradas são hexadecimais, seguras para interpolação em URL. Credenciais fornecidas manualmente precisam de URL encoding; preferir o gerador local. Uma mudança no .env não rotaciona automaticamente usuários de um volume PostgreSQL já inicializado: fazer rotação explícita e coordenada das roles antes de alterar a configuração de runtime.
 
-## Acessos realmente necessários
+## Ambientes de execução
 
-| Serviço                              | Estado auditado                           | Quando exigir ação                                                       |
-| ------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------ |
-| GitHub                               | CLI autenticado com repo/workflow         | Nenhuma credencial para desenvolvimento                                  |
-| VPS/SSH                              | Acesso por chave existente validado       | Nenhuma credencial para auditoria; criar identidade de deploy restrita   |
-| Cloudflare                           | Tunnel ativo no host                      | Sessão/API scoped apenas ao configurar novo DNS/Tunnel                   |
-| Skyscanner ou alternativa contratada | Acesso de API do produto não comprovado   | Antes de cotações reais; validar parceria, quota e termos                |
-| Booking ou alternativa contratada    | Credenciais de Demand API não comprovadas | Antes de hotéis reais; parceiro gerenciado + API key/affiliate ID        |
-| Mapas                                | Não necessário para estimativa manual     | Quando habilitar distância/custo automático                              |
-| E-mail                               | Não necessário no bootstrap               | Antes de envio solicitado pelo usuário, com remetente/domínio verificado |
-| Banco externo                        | Desnecessário                             | PostgreSQL isolado pode operar na VPS existente                          |
+Principal: viagens-local, volumes PostgreSQL/backup próprios, nenhuma porta do banco no host. npm run local:up exige Docker e realiza backup antes da migration. Use volumes novos ou migração deliberada ao incorporar esta fase em uma instalação manual anterior; não reusar bancos de outros produtos.
 
-Nenhum token deve ser colado em chat ou commit. Configurar em secret manager/arquivo restrito/GitHub Environment.
+Testes: viagens-phase1-test-PID com .runtime/arquivo.env protegido, bancos/volumes descartáveis e portas apenas loopback 15495/18095. test:system gera e injeta DATABASE_URL, MIGRATION_DATABASE_URL, TEST_ADMIN_URL e TEST_DATABASE_CONTAINER para a suíte; não copiar esses valores para configuração principal. RUN_DATABASE_TESTS é obrigatório; o comando isolado recusa executar sem ambiente preparado.
 
-## CD ainda não provisionado
+Desenvolvimento frontend: npm run dev:web, com proxy API para localhost:3001. API nativa requer PostgreSQL próprio acessível localmente, migrations aplicadas e DATABASE_URL runtime exportada; o modo Docker completo é o caminho documentado para esta fase. npm run dev não substitui a configuração do banco e não carrega .env automaticamente.
 
-Criar environments staging/production, com revisão para production. Secrets por ambiente: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS (host key validada fora da sessão de deploy). Não copiar automaticamente a chave administrativa existente. Provisionar diretório e runtime.env modo 600, usuário mínimo com acesso controlado ao Docker. Definir DEPLOY_ENABLED=true somente após esses controles e teste privado.
+## Credenciais externas
 
-Bootstrapping local não exige nenhuma autenticação adicional. Não há justificativa para solicitar todos os serviços comerciais de uma vez agora.
+Nenhuma necessária para concluir a Fase 1. GitHub já autenticado. Não acessar VPS, Cloudflare, fornecedores, e-mail ou outros produtos.
+
+Próxima fase: credencial de deploy restrita, fingerprint SSH validado, environments GitHub e destino offsite autenticado. DEPLOY_ENABLED e PERSISTENCE_DEPLOY_READY devem continuar desabilitados até resolver esses gates. Não reaproveitar automaticamente chave administrativa ou contas de banco existentes.
+
+Os templates staging/production são planejamento herdado, não ambientes provisionados. Em APP_ENV não-local, todas as origens devem ser HTTPS e os cookies serão Secure.

@@ -11,19 +11,6 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: viagens_ci
-          POSTGRES_USER: viagens_ci
-          POSTGRES_PASSWORD: ci-only-ephemeral
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd "pg_isready -U viagens_ci -d viagens_ci"
-          --health-interval 5s --health-timeout 5s --health-retries 10
-    env:
-      DATABASE_URL: postgresql://viagens_ci:ci-only-ephemeral@127.0.0.1:5432/viagens_ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,34 +19,26 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - name: Test migration twice and row isolation
-        run: |
-          npm run db:migrate
-          npm run db:migrate
-          npm run test:database
       - name: Dependency security
-        run: npm audit --omit=dev --audit-level=high
-      - name: Compose and HTTP smoke
-        run: |
-          docker compose -f infra/compose.yml config --quiet
-          docker compose -f infra/compose.yml up -d --build --wait --wait-timeout 180
-          curl --fail http://127.0.0.1:8094/health/ready
-          curl --fail http://127.0.0.1:8094/ > /dev/null
-          curl --fail -H 'content-type: application/json' --data @tests/fixtures/search.json http://127.0.0.1:8094/v1/search/month > /dev/null
-      - name: Browser checks on desktop and mobile
-        run: |
-          npx playwright install --with-deps chromium
-          npm run test:browser
+        run: npm audit --audit-level=high
+      - name: Browser runtime
+        run: npx playwright install --with-deps chromium
+      - name: Isolated runtime, ownership, browser and backup/restore
+        run: npm run test:system
       - uses: actions/upload-artifact@v4
         with:
           name: viagens-web-${{ github.sha }}
           path: apps/web/dist
-      - name: Stop test containers
+      - uses: actions/upload-artifact@v4
         if: always()
-        run: docker compose -f infra/compose.yml down
+        with:
+          name: verification-evidence-${{ github.sha }}
+          path: |
+            .runtime/restore-evidence.json
+            .runtime/identity-*.png
   deploy:
     needs: quality
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && vars.DEPLOY_ENABLED == 'true'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && vars.DEPLOY_ENABLED == 'true' && vars.PERSISTENCE_DEPLOY_READY == 'true'
     uses: ./.github/workflows/deploy.yml
     with:
       target: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}

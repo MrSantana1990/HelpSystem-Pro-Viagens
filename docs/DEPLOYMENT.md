@@ -1,37 +1,33 @@
-# Deploy
+# Implantação — Fase 1 exclusivamente local
 
-## Estado da entrega
-
-CI executa verificações e smoke de contêineres. CD está implementado, mas condicionado a DEPLOY_ENABLED=true, environments/secrets e provisionamento. Nenhum deploy público, DNS ou reinício de serviço existente integra esta entrega.
-
-## Local
+## Desenvolvimento
 
 ```sh
 npm ci
-npm run check
-docker compose -f infra/compose.yml up -d --build --wait
-curl http://127.0.0.1:8094/health/ready
+npm run local:setup
+npm run local:up
 ```
 
-Perfil data é opt-in: configurar senhas próprias em .env e executar `docker compose --env-file .env -f infra/compose.yml --profile data up -d`. Não habilitar em produção sem backup, papel de banco não-superusuário para runtime e controles de acesso.
+Abre http://localhost:8094. O script cria configuração privada somente se ausente, constrói web/API/migrate, inicia PostgreSQL, gera pg_dump pré-migration, aplica migrations com viagens_migrator e inicia API/web com health checks. Migration não roda dentro do processo runtime.
 
-## Fluxo GitHub
+A API exige banco e recusa role privilegiada, schema incompleto ou RLS inválido. Não usar docker compose up em um banco novo sem aplicar migrations. O banco principal não publica porta no host.
 
-Feature/agent → Quality (testes/build). PR → Quality. develop → Quality → staging. main → Quality → production. Job de deploy reutilizável só é chamado após sucesso, em push de develop/main, com variável habilitada. Não existe workflow_dispatch que contorne testes. O environment production deve exigir revisão.
+Parar sem excluir dados: docker compose --env-file .env -f infra/compose.yml stop. Nunca usar down -v no projeto principal por rotina.
 
-Quality constrói web e API e testa via Nginx; migra PostgreSQL descartável duas vezes e comprova RLS com role não privilegiada. O artefato web guarda o SHA. Imagens são reconstruídas a partir de lockfile no destino; fixação de imagens por digest e publicação em registry ficam antes de produção comercial.
+## Testes
 
-## Primeiro provisionamento (pendente)
+npm run test:system usa projeto/volumes descartáveis com nome viagens-phase1-test-PID. Executa migração idempotente, runtime/ownership, navegador e restore em novo banco temporário; remove apenas esses recursos no finally. Scripts rejeitam alvo de restore que não pertença ao projeto de teste. A porta loopback adicional do PostgreSQL só existe em infra/compose.test.yml.
 
-1. Revalidar RAM/disco/portas e estado dos serviços existentes.
-2. Criar usuário/credenciais exclusivos, diretórios por ambiente em /opt/projetos/helpsystempro-viagens, repository e runtime.env protegido; clone deste repositório.
-3. Usar templates de ambiente com porta exclusiva e projeto Compose fixo.
-4. Configurar secrets e fingerprint SSH validado; testar staging por túnel SSH.
-5. Após aprovação da publicação, fazer backup da configuração Cloudflare, adicionar hostname específico e validar ingress; somente então ativar DNS/TLS. Proposta: viagens.helpsystempro.site. Não usar .com.br sem verificar titularidade.
-6. Habilitar CD. Primeira implantação deve demonstrar rollback e ausência de impacto nos outros produtos.
+## CI e revisão
 
-## Rollback
+Quality roda npm ci, check, npm audit, Docker build, PostgreSQL real, navegador e backup/restore. Evidência sanitizada e build web são artefatos; .env e dumps não são enviados.
 
-infra/deploy.sh trava deploy concorrente com flock, faz fetch do SHA verificado e worktree por release. Symlink current muda após todos os health checks. Falha reativa Compose da release anterior, se existente. No primeiro deploy não há release anterior: diagnosticar o ambiente novo sem mexer em outros projetos. Não remove worktrees antigas automaticamente.
+O PR de Fase 0 ainda não estava mesclado ao começar. A Fase 1 é uma branch descendente de 4008e96 e seu PR deve ter a branch da Fase 0 como base enquanto o PR #1 estiver aberto. Depois da revisão/merge da base, atualizar a base do PR para main. Nenhum merge automático.
 
-Migration de dados não roda implicitamente em deploy demo. Quando persistência for ativada: pg_dump antes, migration expand/contract e teste de restore isolado. Rollback de código não é rollback de dados.
+## CD compartilhado permanece bloqueado
+
+Fluxo por SHA/worktree preservado. Além de DEPLOY_ENABLED, a chamada exige PERSISTENCE_DEPLOY_READY=true. Nenhuma dessas flags foi habilitada; staging não foi provisionado, nem VPS/DNS/Cloudflare alterados.
+
+A próxima fase deve preparar o deploy persistente: backup pré-migration verificado, execução DDL separada, health de dependências, rollback compatível com schema e teste de restore. O script de deploy herdado da Fase 0 não aplica essas migrations; não habilitar o gate para contorná-lo.
+
+Antes de ativar staging: destino offsite autenticado, usuário de deploy restrito, secrets próprios, revisão de capacidades/portas, ambiente GitHub com controle de publicação, trustProxy e HTTPS validados. Alvos de RPO 24h/RTO 4h não estão comprovados por um teste pequeno local.

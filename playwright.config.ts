@@ -3,7 +3,7 @@ export default defineConfig({
   testDir: './tests/browser',
   outputDir: './.runtime/browser-results',
   use: {
-    baseURL: 'http://127.0.0.1:8094',
+    baseURL: process.env.BASE_URL ?? 'http://127.0.0.1:8094',
     headless: true,
     ...(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {}),
   },

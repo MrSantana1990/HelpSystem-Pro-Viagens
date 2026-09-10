@@ -478,3 +478,213 @@ a:focus-visible {
     font-size: 12px;
   }
 }
+.auth-shell {
+  max-width: 680px;
+  padding: 40px 24px;
+  margin: auto;
+}
+.auth-intro {
+  padding: 42px 0 24px;
+}
+.auth-intro p {
+  color: #60766a;
+  line-height: 1.6;
+}
+.auth-card {
+  background: #fff;
+  border: 1px solid #dce4d8;
+  border-radius: 16px;
+  padding: 30px;
+  margin-bottom: 24px;
+}
+.auth-card label {
+  margin: 16px 0;
+}
+.text-button {
+  border: 0;
+  background: transparent;
+  color: #315e4c;
+  padding: 10px 6px;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.secondary {
+  border: 1px solid #456d58;
+  background: #f2f6ed;
+  color: #214b41;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 12px;
+}
+.secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.save-plan {
+  width: 100%;
+  margin-top: 16px;
+}
+.success {
+  color: #2d664d;
+  background: #edf5e8;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 13px;
+}
+.account-shell {
+  max-width: 1224px;
+  margin: 0 auto;
+  padding: 24px 0 4px;
+}
+.account-toolbar,
+.journey-heading,
+.inline-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.account-toolbar span {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.journey-heading h2 {
+  margin: 20px 0;
+}
+.journey-list,
+.saved-scenarios {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 12px;
+}
+.journey-card,
+.scenario-card {
+  background: #fff;
+  border: 1px solid #dce4d8;
+  border-radius: 12px;
+  padding: 18px;
+  text-align: left;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.journey-card strong,
+.journey-card span,
+.journey-card small {
+  display: block;
+  margin: 5px 0;
+}
+.journey-card strong {
+  font-size: 14px;
+}
+.journey-card span,
+.journey-card small {
+  font-size: 12px;
+  color: #637969;
+}
+.journey-card.chosen {
+  border: 2px solid #54795f;
+  background: #eef4e8;
+}
+.saved-journey {
+  margin: 24px 0;
+  border-top: 1px solid #dce4d8;
+  padding-top: 10px;
+}
+.scenario-card p,
+.scenario-card small {
+  font-size: 11px;
+  color: #69806f;
+}
+.scenario-choice {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  font-size: 12px;
+}
+.scenario-choice input {
+  width: 18px;
+  height: 18px;
+}
+.saved-scenarios {
+  margin: 18px 0;
+}
+.danger {
+  color: #914d38;
+}
+.comparison {
+  overflow: auto;
+  margin-top: 20px;
+  max-width: 100%;
+  border: 1px solid #dce4d8;
+  border-radius: 10px;
+}
+.comparison table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 350px;
+  background: white;
+  font-size: 12px;
+}
+.comparison th,
+.comparison td {
+  padding: 12px;
+  border-bottom: 1px solid #e4e9df;
+  text-align: left;
+}
+.comparison caption {
+  padding: 12px;
+  font-size: 12px;
+  text-align: left;
+}
+.comparison td {
+  white-space: nowrap;
+}
+.scenario-card h3 {
+  margin-top: 12px;
+}
+@media (max-width: 1300px) {
+  .account-shell {
+    padding-left: 48px;
+    padding-right: 48px;
+  }
+}
+@media (max-width: 900px) {
+  .account-shell {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+@media (max-width: 700px) {
+  .account-shell {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  .auth-shell {
+    padding: 24px 18px;
+  }
+  .auth-card {
+    padding: 24px;
+  }
+  .account-toolbar .eyebrow {
+    font-size: 8px;
+  }
+  .comparison table {
+    min-width: 0;
+    font-size: 9px;
+  }
+  .comparison th,
+  .comparison td {
+    padding: 8px 4px;
+  }
+  .comparison td {
+    white-space: normal;
+  }
+  .comparison th {
+    overflow-wrap: anywhere;
+  }
+  .saved-scenarios {
+    grid-template-columns: 1fr;
+  }
+}

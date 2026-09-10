@@ -22,7 +22,11 @@ for run in runs["workflow_runs"]:
         continue
     jobs = get(f'/actions/runs/{run["id"]}/jobs')
     if any(job["name"] == "quality" and job["conclusion"] == "success" for job in jobs["jobs"]):
-        print(json.dumps({"qualityRun": run["id"], "revision": revision}))
-        break
+        artifacts = get(f'/actions/runs/{run["id"]}/artifacts')
+        matching = [artifact for artifact in artifacts['artifacts'] if not artifact['expired'] and re.fullmatch(f'staging-images-{revision}-[a-f0-9]{{64}}', artifact['name'])]
+        if matching:
+            latest = max(matching, key=lambda artifact: artifact['id'])
+            print(json.dumps({"qualityRun": run["id"], "revision": revision, "archiveSha256": latest['name'].rsplit('-', 1)[1]}))
+            break
 else:
     sys.exit("Successful Quality for this revision required")

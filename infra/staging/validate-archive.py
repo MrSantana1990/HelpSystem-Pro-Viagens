@@ -1,15 +1,21 @@
 """Validate Docker save archives without extracting to the host filesystem."""
 import json
+import hashlib
 import re
 import sys
 import tarfile
 from pathlib import PurePosixPath
 
 
-def validate(path, revision):
+def validate(path, revision, expected_digest=None):
     if not re.fullmatch(r"[a-f0-9]{40}", revision):
         raise ValueError("Invalid revision")
     expected = {f"viagens-staging-{service}:{revision}" for service in ("api", "web")}
+    if expected_digest is not None:
+        with open(path, 'rb') as stream:
+            digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+        if not re.fullmatch('[a-f0-9]{64}', expected_digest) or digest != expected_digest:
+            raise ValueError('Artifact digest mismatch')
     with tarfile.open(path, "r:") as archive:
         if len(archive.getnames()) != len(set(archive.getnames())):
             raise ValueError("Duplicate archive names forbidden")
@@ -42,6 +48,6 @@ def validate(path, revision):
 
 if __name__ == "__main__":
     try:
-        validate(sys.argv[1], sys.argv[2])
+        validate(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
     except Exception:
         sys.exit("Image archive rejected")

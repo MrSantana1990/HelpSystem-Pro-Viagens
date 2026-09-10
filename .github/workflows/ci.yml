@@ -11,6 +11,8 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    outputs:
+      image-artifact: ${{ steps.package.outputs.artifact }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,6 +32,7 @@ jobs:
       - name: Isolated runtime, ownership, browser and backup/restore
         run: npm run test:system
       - name: Package exact release images
+        id: package
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/agent/staging-provisioning-cd')
         env:
           REVISION: ${{ github.sha }}
@@ -38,10 +41,11 @@ jobs:
           docker build --label "org.opencontainers.image.revision=$REVISION" -f infra/Dockerfile.web -t "viagens-staging-web:$REVISION" .
           docker save -o .runtime/release.tar "viagens-staging-api:$REVISION" "viagens-staging-web:$REVISION"
           python3 infra/staging/validate-archive.py .runtime/release.tar "$REVISION"
+          echo "artifact=staging-images-$REVISION-$(sha256sum .runtime/release.tar | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/agent/staging-provisioning-cd')
         with:
-          name: staging-images-${{ github.sha }}
+          name: ${{ steps.package.outputs.artifact }}
           path: .runtime/release.tar
           retention-days: 7
       - uses: actions/upload-artifact@v4
@@ -59,4 +63,6 @@ jobs:
     needs: quality
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/agent/staging-provisioning-cd') && vars.STAGING_DEPLOY_ENABLED == 'true'
     uses: ./.github/workflows/deploy.yml
+    with:
+      image-artifact: ${{ needs.quality.outputs.image-artifact }}
     secrets: inherit

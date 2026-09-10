@@ -57,6 +57,11 @@ class ArchiveBoundary(unittest.TestCase):
         with self.assertRaises(ValueError):
             guard.validate('unused', '../../other-product')
 
+    def test_retagged_archive_cannot_bypass_quality(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(ValueError):
+                guard.validate(self.archive(directory), sha, '0'*64)
+
     def test_foreign_oci_name_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             path = self.archive(directory)

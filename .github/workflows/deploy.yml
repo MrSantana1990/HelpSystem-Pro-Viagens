@@ -1,6 +1,10 @@
 ﻿name: Deploy private staging
 on:
   workflow_call:
+    inputs:
+      image-artifact:
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -14,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: staging-images-${{ github.sha }}
+          name: ${{ inputs.image-artifact }}
           path: .runtime
       - name: Deploy verified commit through restricted identity
         env:

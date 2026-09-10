@@ -11,7 +11,8 @@ exec 9>"$base/deploy.lock"
 flock -w 300 9
 exec > >(tee -a "$base/logs/deploy.log") 2>&1
 started=$(date +%s)
-python3 "$base/ops/verify-quality.py" "$revision"
+python3 "$base/ops/verify-quality.py" "$revision" > "$base/incoming/quality.json"
+cat "$base/incoming/quality.json"
 cd "$base/repository"
 git fetch --quiet origin "$revision"
 test "$(git rev-parse FETCH_HEAD)" = "$revision"
@@ -24,7 +25,8 @@ bundle="$base/incoming/$revision.tar"
 trap 'rm -f -- "$bundle"' EXIT
 timeout 240 head -c 536870913 > "$bundle"
 test "$(stat -c %s "$bundle")" -le 536870912
-python3 "$base/ops/validate-archive.py" "$bundle" "$revision"
+digest=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["archiveSha256"])' "$base/incoming/quality.json")
+python3 "$base/ops/validate-archive.py" "$bundle" "$revision" "$digest"
 docker load -i "$bundle" >/dev/null
 for service in api web; do
   test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "viagens-staging-$service:$revision")" = "$revision"

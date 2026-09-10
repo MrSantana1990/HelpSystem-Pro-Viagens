@@ -1,0 +1,76 @@
+name: ${COMPOSE_PROJECT_NAME:-viagens-local}
+x-runtime: &runtime
+  restart: unless-stopped
+  security_opt: ['no-new-privileges:true']
+  logging:
+    driver: json-file
+    options: { max-size: '10m', max-file: '3' }
+services:
+  api:
+    <<: *runtime
+    build: { context: .., dockerfile: infra/Dockerfile.api }
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      PROVIDER_MODE: demo
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    mem_limit: 256m
+    cpus: 0.5
+    networks: [private]
+  web:
+    <<: *runtime
+    build: { context: .., dockerfile: infra/Dockerfile.web }
+    ports: ['127.0.0.1:${WEB_PORT:-8094}:8080']
+    depends_on:
+      api: { condition: service_healthy }
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    mem_limit: 128m
+    cpus: 0.5
+    networks: [private, edge]
+  postgres:
+    <<: *runtime
+    profiles: [data]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: viagens
+      POSTGRES_USER: viagens
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U viagens -d viagens']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 512m
+    networks: [private]
+  redis:
+    <<: *runtime
+    profiles: [data]
+    image: redis:7.4-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command:
+      [
+        sh,
+        -ec,
+        'test -n "$$REDIS_PASSWORD"; exec redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory 96mb --maxmemory-policy allkeys-lru',
+      ]
+    healthcheck:
+      test:
+        [
+          CMD-SHELL,
+          'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 128m
+    networks: [private]
+networks:
+  private: { internal: true }
+  edge: {}
+volumes:
+  postgres_data: {}

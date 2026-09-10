@@ -1,0 +1,13 @@
+{
+  "origin": "SSA",
+  "destination": "REC",
+  "month": "2028-02",
+  "nights": 5,
+  "travelers": 2,
+  "rooms": 1,
+  "budgetCents": 600000,
+  "foodPerPersonDayCents": 10000,
+  "transportPerDayCents": 6000,
+  "activitiesPerPersonCents": 25000,
+  "doorToDoorCents": 20000
+}

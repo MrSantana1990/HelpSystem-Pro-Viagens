@@ -1,0 +1,99 @@
+name: viagens-staging
+x-runtime: &runtime
+  restart: unless-stopped
+  security_opt: ['no-new-privileges:true']
+  logging:
+    driver: json-file
+    options: { max-size: '10m', max-file: '3' }
+  pids_limit: 128
+services:
+  postgres:
+    <<: *runtime
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: viagens
+      POSTGRES_USER: viagens_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      MIGRATION_PASSWORD: ${MIGRATION_PASSWORD:?required}
+      RUNTIME_PASSWORD: ${RUNTIME_PASSWORD:?required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - backup_data:/backups
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/010-roles.sh:ro
+      - ./backup.sh:/operations/backup.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U viagens_admin -d viagens']
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    mem_limit: 512m
+    cpus: 0.75
+    networks: [private]
+  migrate:
+    image: viagens-staging-api:${RELEASE_SHA:?required}
+    profiles: [tools]
+    user: '1000:1000'
+    entrypoint: ['node']
+    command: ['dist/packages/database/src/migrate.js']
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://viagens_migrator:${MIGRATION_PASSWORD}@postgres:5432/viagens
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    networks: [private]
+  api:
+    <<: *runtime
+    image: viagens-staging-api:${RELEASE_SHA:?required}
+    user: '1000:1000'
+    entrypoint: ['node']
+    command: ['dist/apps/api/src/server.js']
+    environment:
+      APP_ENV: staging
+      HOST: 0.0.0.0
+      PORT: 3001
+      PROVIDER_MODE: demo
+      RELEASE_SHA: ${RELEASE_SHA}
+      DATABASE_URL: postgresql://viagens_runtime:${RUNTIME_PASSWORD}@postgres:5432/viagens
+      APP_ORIGINS: https://localhost:18094
+    depends_on:
+      postgres: { condition: service_healthy }
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    mem_limit: 512m
+    cpus: 1
+    networks: [private]
+  web:
+    <<: *runtime
+    image: viagens-staging-web:${RELEASE_SHA:?required}
+    user: '101:101'
+    entrypoint: ['nginx']
+    command: ['-g', 'daemon off;']
+    ports: ['127.0.0.1:18094:8080']
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../tls/server.crt:/etc/viagens/server.crt:ro
+      - ../tls/server.key:/etc/viagens/server.key:ro
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8081/health/web']
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    mem_limit: 128m
+    cpus: 0.5
+    networks: [private, edge]
+networks:
+  private: { internal: true }
+  edge: {}
+volumes:
+  postgres_data: {}
+  backup_data: {}

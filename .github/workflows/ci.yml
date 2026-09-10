@@ -1,13 +1,13 @@
-name: Quality
+﻿name: Quality
 on:
   push:
-    branches: [main, develop, 'feature/**', 'agent/**']
+    branches: [main, 'feature/**', 'agent/**']
   pull_request:
 permissions:
   contents: read
 concurrency:
   group: quality-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -21,10 +21,29 @@ jobs:
       - run: npm run check
       - name: Dependency security
         run: npm audit --audit-level=high
+      - name: Deployment boundary tests
+        run: |
+          python3 -m unittest discover -s tests/deploy -p 'test_*.py'
+          bash -n infra/staging/*.sh
       - name: Browser runtime
         run: npx playwright install --with-deps chromium
       - name: Isolated runtime, ownership, browser and backup/restore
         run: npm run test:system
+      - name: Package exact release images
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/agent/staging-provisioning-cd')
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          docker build --label "org.opencontainers.image.revision=$REVISION" -f infra/Dockerfile.api -t "viagens-staging-api:$REVISION" .
+          docker build --label "org.opencontainers.image.revision=$REVISION" -f infra/Dockerfile.web -t "viagens-staging-web:$REVISION" .
+          docker save -o .runtime/release.tar "viagens-staging-api:$REVISION" "viagens-staging-web:$REVISION"
+          python3 infra/staging/validate-archive.py .runtime/release.tar "$REVISION"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/agent/staging-provisioning-cd')
+        with:
+          name: staging-images-${{ github.sha }}
+          path: .runtime/release.tar
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: viagens-web-${{ github.sha }}
@@ -38,8 +57,6 @@ jobs:
             .runtime/identity-*.png
   deploy:
     needs: quality
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && vars.DEPLOY_ENABLED == 'true' && vars.PERSISTENCE_DEPLOY_READY == 'true'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/agent/staging-provisioning-cd') && vars.STAGING_DEPLOY_ENABLED == 'true'
     uses: ./.github/workflows/deploy.yml
-    with:
-      target: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
     secrets: inherit

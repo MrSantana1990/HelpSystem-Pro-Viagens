@@ -33,7 +33,15 @@ export async function buildApp(
 ) {
   const db = new Database(options.databaseUrl);
   const app = Fastify({
-    logger: logging ? loggerOptions : false,
+    logger: logging
+      ? {
+          ...loggerOptions,
+          base: {
+            environment: process.env.APP_ENV ?? 'local',
+            release: process.env.RELEASE_SHA ?? 'development',
+          },
+        }
+      : false,
     bodyLimit: 16384,
     requestIdHeader: false,
     genReqId: () => randomUUID(),
@@ -47,6 +55,8 @@ export async function buildApp(
       .header('x-correlation-id', request.id)
       .header('cache-control', 'no-store')
       .header('x-content-type-options', 'nosniff');
+    if (/^[a-f0-9]{40}$/.test(process.env.RELEASE_SHA ?? ''))
+      reply.header('x-release-sha', process.env.RELEASE_SHA!);
   });
   app.setErrorHandler((error, request, reply) => {
     const status =

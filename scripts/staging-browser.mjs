@@ -34,9 +34,14 @@ try {
     await page.getByLabel('E-mail', { exact: true }).fill(account.email);
     await page.getByLabel('Senha', { exact: true }).fill(account.password);
     await page.getByRole('button', { name: 'Cadastrar', exact: true }).click();
-    await page.getByRole('heading', { name: 'Entre para planejar' }).waitFor();
+    await page
+      .getByRole('heading', { name: 'Entre para salvar seus planos' })
+      .waitFor();
     await page.getByLabel('Senha', { exact: true }).fill(account.password);
-    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Entrar', exact: true })
+      .click();
     await page.getByRole('heading', { name: 'Minhas viagens' }).waitFor();
     const cookies = await context.cookies();
     const session = cookies.find((c) => c.name === '__Host-viagens_session');
@@ -56,10 +61,16 @@ try {
     await page.locator('.journey-card').filter({ hasText: title }).click();
     await page.locator('.scenario-card').waitFor();
     await page.getByRole('button', { name: 'Sair', exact: true }).click();
-    await page.getByRole('heading', { name: 'Entre para planejar' }).waitFor();
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+    await page
+      .getByRole('heading', { name: 'Entre para salvar seus planos' })
+      .waitFor();
     await page.getByLabel('E-mail', { exact: true }).fill(account.email);
     await page.getByLabel('Senha', { exact: true }).fill(account.password);
-    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Entrar', exact: true })
+      .click();
     await page.locator('.journey-card').filter({ hasText: title }).click();
     await page.locator('.scenario-card').waitFor();
     assert.equal(

@@ -59,6 +59,7 @@ jobs:
           path: |
             .runtime/restore-evidence.json
             .runtime/identity-*.png
+            .runtime/guest-*.png
   deploy:
     needs: quality
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/agent/staging-provisioning-cd') && vars.STAGING_DEPLOY_ENABLED == 'true'

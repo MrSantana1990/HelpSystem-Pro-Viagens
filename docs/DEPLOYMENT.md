@@ -34,7 +34,7 @@ Arquivos operacionais não são atualizados automaticamente a partir de release.
 ssh -N -L 127.0.0.1:18094:127.0.0.1:18094 viagens-staging
 ```
 
-Alias local configurado com a chave exclusiva viagens_staging_access. Acessar https://localhost:18094 e confiar somente na CA privada obtida pelo canal SSH autenticado. Não usar exceção global de TLS. API exige HTTPS e cookies Secure; a conta da aplicação continua obrigatória.
+Alias local configurado com a chave exclusiva viagens_staging_access. Acessar https://localhost:18094 e confiar somente na CA privada obtida pelo canal SSH autenticado. Não usar exceção global de TLS. API exige HTTPS e cookies Secure; a conta da aplicação é obrigatória para salvar/gerenciar viagens, enquanto a exploração funciona sem cadastro. Acesso anônimo ao produto não torna o staging público: o túnel privado continua necessário.
 
 A chave de acesso não executa comandos. Encaminhamento permitido somente para a porta exclusiva; autorização de reverse bind também limitada à mesma porta já ocupada pelo staging. Chave de deploy não permite forwarding.
 

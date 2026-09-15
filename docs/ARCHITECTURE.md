@@ -70,3 +70,9 @@ Frontend mantém a experiência de planejamento e acrescenta conta/minhas viagen
 GitHub Actions constrói/testa imagens; transporta pacote por identidade SSH restrita. Helper administrativo fixo valida Quality, SHA e imagens, mantém release/worktree e ativa current após backup, migration, health e smoke. Compose/root scripts ficam fora dos worktrees para que a credencial de aplicação não possa ampliar privilégios de host. Nenhum build ocorre na VPS.
 
 Acesso: navegador → túnel SSH limitado → HTTPS localhost:18094 → Nginx staging → API → PostgreSQL staging. Redes, volumes, roles e secrets próprios. Redis continua desnecessário. Main entrega staging nesta fase; produção desabilitada. ADR 005 registra essa evolução do fluxo planejado no ADR 003.
+
+## Exploração sem cadastro
+
+A página inicial abre o Planner para visitantes. POST /v1/search/month já é anônimo e continua limitado/validado, sem criar identidade ou sessão. Calendário, ranking e detalhamento ficam disponíveis; /v1/trips e cenários persistentes continuam protegidos por sessão, CSRF e RLS.
+
+Login/cadastro aparecem em diálogo nativo ao solicitar a conta ou tentar salvar. O mesmo Planner permanece montado, preservando input, títulos, ranking e data selecionada durante fechamento/reabertura, erro de login e cadastro/login bem-sucedidos. Não há gravação automática: após entrar, a pessoa confirma salvar. Rascunho de visitante existe somente na memória da página, sem localStorage; reload/fechamento o descartam. Logout/expiração reiniciam o Planner e removem dados privados da interface.

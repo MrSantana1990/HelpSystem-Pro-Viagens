@@ -1,6 +1,8 @@
 ﻿# HelpSystem Pro Viagens
 
-Planejamento de viagens com React/Vite, Fastify/Node 22 e PostgreSQL 16. Cadastro/login próprios, sessões revogáveis, viagens e cenários persistentes, comparação de até três opções e isolamento por usuário com RLS.
+Planejamento de viagens sem cadastro: explore datas, calendário, Top 5 e custos completos. Para salvar, retomar e gerenciar viagens ou comparar até três cenários salvos, entre ou crie sua conta. O plano em andamento permanece na página durante cadastro/login; sem conta, ele não é salvo após fechar ou recarregar a página.
+
+React/Vite, Fastify/Node 22 e PostgreSQL 16, sessões revogáveis e isolamento por usuário com RLS.
 
 Preços atuais são **DEMO/SIMULADOS**, em centavos de BRL. Não representam reserva, disponibilidade ou tarifa real. Travel Score v0 é uma heurística de orçamento.
 
@@ -12,7 +14,7 @@ npm run local:setup
 npm run local:up
 ```
 
-Acesse http://localhost:8094 e crie sua conta. Configuração e senhas próprias são geradas em .env protegido; não existe conta padrão. PostgreSQL não publica porta. Redis continua previsto, mas não é iniciado sem necessidade.
+Acesse http://localhost:8094 e comece a explorar. A conta é opcional para explorar e obrigatória para gestão persistente. Configuração e senhas próprias são geradas em .env protegido; não existe conta padrão. PostgreSQL não publica porta. Redis continua previsto, mas não é iniciado sem necessidade.
 
 ## Qualidade
 

@@ -59,3 +59,9 @@ Evidências locais ignoradas pelo Git: .runtime/staging-restore-evidence.json, s
 ## Limites reais
 
 Offsite autenticado ausente; recuperação de perda total do host e RPO/RTO não comprovados. CA privada exige distribuição confiável e renovação de certificado em até 90 dias. A exceção de bootstrap da branch deve ser removida após integrar o PR. Produção, DNS/Cloudflare e providers comerciais não foram ativados.
+
+## Planejamento sem cadastro — 14/09/2026
+
+A suíte desktop/mobile agora começa como visitante: consulta anônima, calendário/Top 5/detalhamento, tentativa de salvar, cancelamento do diálogo, login inválido, cadastro/login e preservação do mesmo título/mês/data selecionada. Depois verifica gravação, comparação, reload e novo login, além da remoção de conteúdo privado ao sair. A API continua negando /v1/trips sem sessão; o teste de busca verifica resposta anônima sem Set-Cookie mesmo com persistência indisponível.
+
+Capturas de visitante em .runtime/guest-desktop.png e guest-mobile.png. Rascunho anônimo é mantido somente durante a página aberta; entrar não grava automaticamente. Publicação do hostname continua fora deste ajuste: staging permanece protegido por túnel. Resultados do novo head registrados no PR #3 e no CI correspondente.

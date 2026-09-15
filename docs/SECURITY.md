@@ -47,3 +47,7 @@ main exige PR e quality, impede force push/deleção. A contagem de aprovações
 Rate limit continua agregado atrás do Nginx, trustProxy permanece desabilitado: adequado ao staging privado pequeno, sem confiar em cabeçalhos arbitrários. Antes de tráfego público, revisar proxy confiável e limites distribuídos. Offsite agora é gate de produção; o Prompt 3 autoriza staging técnico privado sem esse destino. Logs e artefatos não contêm credenciais/dumps. Detalhes e alternativas no ADR 005.
 
 O pacote é vinculado criptograficamente ao SHA-256 registrado no nome do artefato do job Quality no GitHub, consultado pelo servidor via HTTPS. A validação não depende apenas de tags/labels fornecidas pelo cliente de deploy.
+
+## Visitantes
+
+Exploração de datas/custos sem cadastro não concede acesso a viagens salvas. Auth/CSRF/RLS de endpoints privados permanecem inalterados. A consulta inicial de sessão sem identidade não emite um evento falso de expiração nem apaga o rascunho público. Logout/expiração reais removem estado privado e reiniciam o Planner; entrar a partir de um rascunho público o preserva na memória da mesma página. Diálogo nativo mantém foco e permite voltar à exploração. Nenhum novo cookie/token ou armazenamento local é criado para visitantes.

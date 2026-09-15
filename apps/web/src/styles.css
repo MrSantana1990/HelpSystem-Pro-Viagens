@@ -483,6 +483,33 @@ a:focus-visible {
   padding: 40px 24px;
   margin: auto;
 }
+.auth-dialog {
+  width: min(520px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  color: inherit;
+}
+.auth-dialog::backdrop {
+  background: rgb(18 44 35 / 55%);
+}
+.auth-dialog .auth-card {
+  margin: 0;
+  border: 0;
+}
+.auth-dialog .text-button {
+  margin-right: 12px;
+}
+.guest-shell {
+  border-bottom: 1px solid #dce4d8;
+  padding-bottom: 16px;
+}
+.guest-shell .fine {
+  margin: 6px 0 0;
+  max-width: 580px;
+}
 .auth-intro {
   padding: 42px 0 24px;
 }

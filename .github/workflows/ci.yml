@@ -1,16 +1,18 @@
-name: Quality
+﻿name: Quality
 on:
   push:
-    branches: [main, develop, 'feature/**', 'agent/**']
+    branches: [main, 'feature/**', 'agent/**']
   pull_request:
 permissions:
   contents: read
 concurrency:
   group: quality-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   quality:
     runs-on: ubuntu-latest
+    outputs:
+      image-artifact: ${{ steps.package.outputs.artifact }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,10 +23,31 @@ jobs:
       - run: npm run check
       - name: Dependency security
         run: npm audit --audit-level=high
+      - name: Deployment boundary tests
+        run: |
+          python3 -m unittest discover -s tests/deploy -p 'test_*.py'
+          for file in infra/staging/*.sh infra/deploy.sh; do bash -n "$file"; done
       - name: Browser runtime
         run: npx playwright install --with-deps chromium
       - name: Isolated runtime, ownership, browser and backup/restore
         run: npm run test:system
+      - name: Package exact release images
+        id: package
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/agent/staging-provisioning-cd')
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          docker build --label "org.opencontainers.image.revision=$REVISION" -f infra/Dockerfile.api -t "viagens-staging-api:$REVISION" .
+          docker build --label "org.opencontainers.image.revision=$REVISION" -f infra/Dockerfile.web -t "viagens-staging-web:$REVISION" .
+          docker save -o .runtime/release.tar "viagens-staging-api:$REVISION" "viagens-staging-web:$REVISION"
+          python3 infra/staging/validate-archive.py .runtime/release.tar "$REVISION"
+          echo "artifact=staging-images-$REVISION-$(sha256sum .runtime/release.tar | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/agent/staging-provisioning-cd')
+        with:
+          name: ${{ steps.package.outputs.artifact }}
+          path: .runtime/release.tar
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: viagens-web-${{ github.sha }}
@@ -33,13 +56,16 @@ jobs:
         if: always()
         with:
           name: verification-evidence-${{ github.sha }}
+          include-hidden-files: true
+          if-no-files-found: error
           path: |
             .runtime/restore-evidence.json
             .runtime/identity-*.png
+            .runtime/guest-*.png
   deploy:
     needs: quality
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && vars.DEPLOY_ENABLED == 'true' && vars.PERSISTENCE_DEPLOY_READY == 'true'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/agent/staging-provisioning-cd') && vars.STAGING_DEPLOY_ENABLED == 'true'
     uses: ./.github/workflows/deploy.yml
     with:
-      target: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+      image-artifact: ${{ needs.quality.outputs.image-artifact }}
     secrets: inherit

@@ -34,7 +34,7 @@ export async function api<T>(
     throw new ApiError('A sessão mudou. Atualize a página.', 409);
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    if (response.status === 401 && !path.endsWith('/login'))
+    if (response.status === 401 && csrfToken && !path.endsWith('/login'))
       window.dispatchEvent(new Event('viagens:session-expired'));
     throw new ApiError(
       data.error?.message ?? 'Não foi possível concluir. Tente novamente.',

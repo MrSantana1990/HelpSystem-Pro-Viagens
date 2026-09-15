@@ -13,7 +13,7 @@ const input = {
   activitiesPerPersonCents: 25000,
   doorToDoorCents: 20000,
 };
-it('serves health and analyzes a month through HTTP with server correlation IDs', async () => {
+it('analyzes a month anonymously without creating a session, even when persistence is unavailable', async () => {
   const app = await buildApp(false);
   try {
     const health = await app.inject('/health/ready');
@@ -29,6 +29,8 @@ it('serves health and analyzes a month through HTTP with server correlation IDs'
     expect(response.json().calendar).toHaveLength(29);
     expect(response.headers['x-correlation-id']).toMatch(/^[0-9a-f-]{36}$/);
     expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers['set-cookie']).toBeUndefined();
+    expect(response.json().ranking).toHaveLength(5);
   } finally {
     await app.close();
   }

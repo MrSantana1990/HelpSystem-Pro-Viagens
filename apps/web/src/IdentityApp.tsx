@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Planner } from './Planner.js';
 import { api, setCsrf, ApiError } from './api.js';
 import type {
@@ -18,6 +18,9 @@ const money = (value: number) =>
 export function IdentityApp() {
   const [session, setSession] = useState<SessionView | null>(null),
     [loading, setLoading] = useState(true);
+  const [showAuth, setShowAuth] = useState(false),
+    [plannerVersion, setPlannerVersion] = useState(0);
+  const authDialog = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<'login' | 'register'>('login'),
     [email, setEmail] = useState(''),
     [password, setPassword] = useState('');
@@ -38,6 +41,9 @@ export function IdentityApp() {
     setEditing(null);
     setComparison([]);
     setSelected([]);
+    setNextOffset(null);
+    setPlannerVersion((version) => version + 1);
+    setShowAuth(false);
   }
   async function list(offset = 0) {
     const data = await api<{ trips: Trip[]; nextOffset: number | null }>(
@@ -64,7 +70,8 @@ export function IdentityApp() {
       })
       .catch((error: unknown) => {
         if (!disposed) {
-          signedOut();
+          setCsrf('');
+          setSession(null);
           setError(
             error instanceof ApiError && error.status === 401
               ? ''
@@ -80,6 +87,9 @@ export function IdentityApp() {
       window.removeEventListener('viagens:session-expired', expire);
     };
   }, []);
+  useEffect(() => {
+    if (showAuth && !session) authDialog.current?.showModal();
+  }, [showAuth, session]);
   useEffect(() => {
     if (!session) return;
     const timer = window.setTimeout(
@@ -114,6 +124,10 @@ export function IdentityApp() {
         setCsrf(data.csrfToken);
         setSession(data);
         setPassword('');
+        setShowAuth(false);
+        setNotice(
+          'Seu planejamento continua abaixo. Salve quando estiver pronto.',
+        );
         await list();
       }
     } catch (e) {
@@ -168,358 +182,421 @@ export function IdentityApp() {
     await list();
     setNotice('Viagem salva no seu espaço.');
   }
-  if (loading)
-    return (
-      <main className="auth-shell" aria-busy="true">
-        <p>Preparando seu espaço de viagens…</p>
-      </main>
-    );
-  if (!session)
-    return (
-      <main className="auth-shell">
-        <a className="brand" href="/">
-          <span className="brand-mark">h.</span>
-          <span>
-            HelpSystem Pro <strong>Viagens</strong>
-          </span>
-        </a>
-        <section className="auth-intro">
-          <p className="eyebrow">SEUS PLANOS MERECEM CONTINUIDADE</p>
-          <h1>
-            A próxima viagem
-            <br />
-            <em>começa no seu espaço.</em>
-          </h1>
-          <p>Compare datas, guarde possibilidades e retome de onde parou.</p>
-        </section>
-        <form className="auth-card" onSubmit={authenticate}>
-          <h2>
-            {mode === 'login' ? 'Entre para planejar' : 'Crie seu espaço'}
-          </h2>
-          <fieldset disabled={busy}>
-            <label>
-              E-mail
-              <input
-                type="email"
-                value={email}
-                required
-                maxLength={254}
-                autoComplete="email"
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </label>
-            <label>
-              Senha
-              <input
-                type="password"
-                value={password}
-                required
-                minLength={mode === 'register' ? 12 : 1}
-                maxLength={128}
-                autoComplete={
-                  mode === 'register' ? 'new-password' : 'current-password'
-                }
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </label>
-            {mode === 'register' ? (
-              <p className="fine">
-                Use pelo menos 12 caracteres. Sua senha não será enviada por
-                e-mail.
-              </p>
-            ) : null}
-            <button className="primary" type="submit">
-              {busy ? 'Aguarde…' : mode === 'login' ? 'Entrar' : 'Cadastrar'}
-            </button>
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => {
-                setMode(mode === 'login' ? 'register' : 'login');
-                setError('');
-                setNotice('');
-                setPassword('');
-              }}
-            >
-              {mode === 'login' ? 'Criar conta' : 'Já tenho conta'}
-            </button>
-          </fieldset>
-          {error ? (
-            <p className="error" role="alert">
-              {error}
+  function requestAccount(register = false) {
+    setMode(register ? 'register' : 'login');
+    setPassword('');
+    setError('');
+    setNotice('Seu planejamento continua aqui enquanto você entra.');
+    setShowAuth(true);
+  }
+  const authentication = (
+    <dialog
+      ref={authDialog}
+      className="auth-dialog"
+      aria-labelledby="auth-title"
+      onCancel={(event) => {
+        if (busy) event.preventDefault();
+        else {
+          setShowAuth(false);
+          setPassword('');
+        }
+      }}
+    >
+      <form className="auth-card" onSubmit={authenticate}>
+        <p className="eyebrow">GUARDE SUAS POSSIBILIDADES</p>
+        <h2 id="auth-title">
+          {mode === 'login'
+            ? 'Entre para salvar seus planos'
+            : 'Crie seu espaço'}
+        </h2>
+        <p className="fine">
+          Explore livremente. Com sua conta, salve viagens, compare cenários
+          salvos e retome seus planos depois.
+        </p>
+        <fieldset disabled={busy}>
+          <label>
+            E-mail
+            <input
+              type="email"
+              value={email}
+              required
+              maxLength={254}
+              autoComplete="email"
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+          <label>
+            Senha
+            <input
+              type="password"
+              value={password}
+              required
+              minLength={mode === 'register' ? 12 : 1}
+              maxLength={128}
+              autoComplete={
+                mode === 'register' ? 'new-password' : 'current-password'
+              }
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+          {mode === 'register' ? (
+            <p className="fine">
+              Use pelo menos 12 caracteres. Sua senha não será enviada por
+              e-mail.
             </p>
           ) : null}
-          {notice ? <p role="status">{notice}</p> : null}
-        </form>
-        <p className="demo-notice">
-          Planejamento com valores DEMO / SIMULADOS. Sem reservas ou compras.
-        </p>
-      </main>
-    );
-  return (
-    <>
-      <section className="account-shell">
-        <div className="account-toolbar">
-          <div>
-            <p className="eyebrow">SEU ESPAÇO DE VIAGENS</p>
-            <span>{session.user.email}</span>
-          </div>
+          <button className="primary" type="submit">
+            {busy ? 'Aguarde…' : mode === 'login' ? 'Entrar' : 'Cadastrar'}
+          </button>
           <button
             className="text-button"
-            disabled={busy}
-            onClick={() =>
-              void act(async () => {
-                await api('/v1/auth/logout', 'POST');
-                signedOut();
-              })
-            }
+            type="button"
+            onClick={() => {
+              setMode(mode === 'login' ? 'register' : 'login');
+              setError('');
+              setNotice('');
+              setPassword('');
+            }}
           >
-            Sair
+            {mode === 'login' ? 'Criar conta' : 'Já tenho conta'}
           </button>
-        </div>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => {
+              setShowAuth(false);
+              setPassword('');
+              setError('');
+              setNotice('');
+            }}
+          >
+            Continuar sem conta
+          </button>
+        </fieldset>
         {error ? (
           <p className="error" role="alert">
             {error}
           </p>
         ) : null}
-        {notice ? (
-          <p className="success" role="status">
-            {notice}
-          </p>
-        ) : null}
-        <div className="journey-heading">
-          <h2>Minhas viagens</h2>
-          <button
-            className="secondary"
-            disabled={busy}
-            onClick={() => {
-              setActive(null);
-              setEditing(null);
-              setSelected([]);
-              setComparison([]);
-              setNotice('');
-            }}
-          >
-            Nova viagem
-          </button>
-        </div>
-        {trips.length === 0 ? (
-          <p className="fine">
-            Seu primeiro plano começa abaixo. Salve uma viagem para retomá-la
-            depois.
-          </p>
-        ) : (
-          <div className="journey-list">
-            {trips.map((trip) => (
-              <button
-                className={
-                  active?.id === trip.id
-                    ? 'journey-card chosen'
-                    : 'journey-card'
-                }
-                key={trip.id}
-                disabled={busy}
-                onClick={() => void act(() => open(trip.id))}
-              >
-                <strong>{trip.title}</strong>
-                <span>
-                  {trip.input.origin} → {trip.input.destination}
-                </span>
-                <small>
-                  {trip.input.month} · {trip.input.nights} noites
-                </small>
-              </button>
-            ))}
-          </div>
-        )}
-        {nextOffset !== null ? (
-          <button
-            className="text-button"
-            disabled={busy}
-            onClick={() => void act(() => list(nextOffset))}
-          >
-            Carregar mais viagens
-          </button>
-        ) : null}
-        {active ? (
-          <section className="saved-journey">
-            <div className="journey-heading">
-              <h3>{active.title}</h3>
-              <div className="inline-actions">
-                <button
-                  className="text-button"
-                  disabled={busy}
-                  onClick={() =>
-                    void act(async () => {
-                      const trip = await api<Trip>(
-                        '/v1/trips/' + active.id + '/duplicate',
-                        'POST',
-                      );
-                      await open(trip.id);
-                      await list();
-                      setNotice('Cópia criada no seu espaço.');
-                    })
-                  }
-                >
-                  Duplicar viagem
-                </button>
-                <button
-                  className="text-button danger"
-                  disabled={busy}
-                  onClick={() => {
-                    if (window.confirm('Excluir esta viagem e seus cenários?'))
-                      void act(async () => {
-                        await api('/v1/trips/' + active.id, 'DELETE');
-                        setActive(null);
-                        setEditing(null);
-                        setComparison([]);
-                        await list();
-                      });
-                  }}
-                >
-                  Excluir viagem
-                </button>
-              </div>
+        {notice ? <p role="status">{notice}</p> : null}
+      </form>
+    </dialog>
+  );
+  return (
+    <>
+      {showAuth && !session ? authentication : null}
+      {session ? (
+        <section className="account-shell">
+          <div className="account-toolbar">
+            <div>
+              <p className="eyebrow">SEU ESPAÇO DE VIAGENS</p>
+              <span>{session.user.email}</span>
             </div>
-            <p className="fine">
-              Cenários salvos são snapshots DEMO. Compare até três; o Score v0
-              mede adequação ao orçamento.
-            </p>
-            <div className="saved-scenarios">
-              {active.scenarios.map((s) => (
-                <article className="scenario-card" key={s.id}>
-                  <label className="scenario-choice">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(s.id)}
-                      disabled={
-                        !selected.includes(s.id) && selected.length >= 3
-                      }
-                      onChange={(e) => {
-                        setSelected(
-                          e.target.checked
-                            ? [...selected, s.id]
-                            : selected.filter((id) => id !== s.id),
-                        );
-                        setComparison([]);
-                      }}
-                    />
-                    Comparar {s.title}
-                  </label>
-                  <h3>{s.title}</h3>
-                  <strong>{money(s.snapshot.costs.total)}</strong>
-                  <p>
-                    {s.snapshot.departure} → {s.snapshot.returnDate}
-                  </p>
-                  <small>DEMO · Score {s.snapshot.score}</small>
-                  <div className="inline-actions">
-                    <button
-                      className="text-button"
-                      disabled={busy}
-                      onClick={() => {
-                        setEditing(s);
-                        setNotice(
-                          'Edite os parâmetros abaixo; explore novamente ao mudar as datas.',
-                        );
-                      }}
-                    >
-                      Editar cenário
-                    </button>
-                    <button
-                      className="text-button danger"
-                      disabled={busy}
-                      onClick={() =>
-                        void act(async () => {
-                          await api(
-                            '/v1/trips/' + active.id + '/scenarios/' + s.id,
-                            'DELETE',
-                          );
-                          await open(active.id);
-                        })
-                      }
-                    >
-                      Excluir cenário
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-            {active.scenarios.length === 0 ? (
-              <p className="fine">
-                Explore o mês e salve uma data para criar seu primeiro cenário.
-              </p>
-            ) : null}
             <button
-              className="secondary"
-              disabled={busy || selected.length === 0}
+              className="text-button"
+              disabled={busy}
               onClick={() =>
                 void act(async () => {
-                  const result = await api<{ scenarios: SavedScenario[] }>(
-                    '/v1/trips/' + active.id + '/compare',
-                    'POST',
-                    { scenarioIds: selected },
-                  );
-                  setComparison(result.scenarios);
+                  await api('/v1/auth/logout', 'POST');
+                  signedOut();
                 })
               }
             >
-              Comparar selecionados ({selected.length}/3)
+              Sair
             </button>
-            {comparison.length > 0 ? (
-              <div
-                className="comparison"
-                role="region"
-                aria-label="Comparação de cenários"
+          </div>
+          {error ? (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {notice ? (
+            <p className="success" role="status">
+              {notice}
+            </p>
+          ) : null}
+          <div className="journey-heading">
+            <h2>Minhas viagens</h2>
+            <button
+              className="secondary"
+              disabled={busy}
+              onClick={() => {
+                setActive(null);
+                setEditing(null);
+                setSelected([]);
+                setComparison([]);
+                setNotice('');
+              }}
+            >
+              Nova viagem
+            </button>
+          </div>
+          {trips.length === 0 ? (
+            <p className="fine">
+              Seu primeiro plano começa abaixo. Salve uma viagem para retomá-la
+              depois.
+            </p>
+          ) : (
+            <div className="journey-list">
+              {trips.map((trip) => (
+                <button
+                  className={
+                    active?.id === trip.id
+                      ? 'journey-card chosen'
+                      : 'journey-card'
+                  }
+                  key={trip.id}
+                  disabled={busy}
+                  onClick={() => void act(() => open(trip.id))}
+                >
+                  <strong>{trip.title}</strong>
+                  <span>
+                    {trip.input.origin} → {trip.input.destination}
+                  </span>
+                  <small>
+                    {trip.input.month} · {trip.input.nights} noites
+                  </small>
+                </button>
+              ))}
+            </div>
+          )}
+          {nextOffset !== null ? (
+            <button
+              className="text-button"
+              disabled={busy}
+              onClick={() => void act(() => list(nextOffset))}
+            >
+              Carregar mais viagens
+            </button>
+          ) : null}
+          {active ? (
+            <section className="saved-journey">
+              <div className="journey-heading">
+                <h3>{active.title}</h3>
+                <div className="inline-actions">
+                  <button
+                    className="text-button"
+                    disabled={busy}
+                    onClick={() =>
+                      void act(async () => {
+                        const trip = await api<Trip>(
+                          '/v1/trips/' + active.id + '/duplicate',
+                          'POST',
+                        );
+                        await open(trip.id);
+                        await list();
+                        setNotice('Cópia criada no seu espaço.');
+                      })
+                    }
+                  >
+                    Duplicar viagem
+                  </button>
+                  <button
+                    className="text-button danger"
+                    disabled={busy}
+                    onClick={() => {
+                      if (
+                        window.confirm('Excluir esta viagem e seus cenários?')
+                      )
+                        void act(async () => {
+                          await api('/v1/trips/' + active.id, 'DELETE');
+                          setActive(null);
+                          setEditing(null);
+                          setComparison([]);
+                          await list();
+                        });
+                    }}
+                  >
+                    Excluir viagem
+                  </button>
+                </div>
+              </div>
+              <p className="fine">
+                Cenários salvos são snapshots DEMO. Compare até três; o Score v0
+                mede adequação ao orçamento.
+              </p>
+              <div className="saved-scenarios">
+                {active.scenarios.map((s) => (
+                  <article className="scenario-card" key={s.id}>
+                    <label className="scenario-choice">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(s.id)}
+                        disabled={
+                          !selected.includes(s.id) && selected.length >= 3
+                        }
+                        onChange={(e) => {
+                          setSelected(
+                            e.target.checked
+                              ? [...selected, s.id]
+                              : selected.filter((id) => id !== s.id),
+                          );
+                          setComparison([]);
+                        }}
+                      />
+                      Comparar {s.title}
+                    </label>
+                    <h3>{s.title}</h3>
+                    <strong>{money(s.snapshot.costs.total)}</strong>
+                    <p>
+                      {s.snapshot.departure} → {s.snapshot.returnDate}
+                    </p>
+                    <small>DEMO · Score {s.snapshot.score}</small>
+                    <div className="inline-actions">
+                      <button
+                        className="text-button"
+                        disabled={busy}
+                        onClick={() => {
+                          setEditing(s);
+                          setNotice(
+                            'Edite os parâmetros abaixo; explore novamente ao mudar as datas.',
+                          );
+                        }}
+                      >
+                        Editar cenário
+                      </button>
+                      <button
+                        className="text-button danger"
+                        disabled={busy}
+                        onClick={() =>
+                          void act(async () => {
+                            await api(
+                              '/v1/trips/' + active.id + '/scenarios/' + s.id,
+                              'DELETE',
+                            );
+                            await open(active.id);
+                          })
+                        }
+                      >
+                        Excluir cenário
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              {active.scenarios.length === 0 ? (
+                <p className="fine">
+                  Explore o mês e salve uma data para criar seu primeiro
+                  cenário.
+                </p>
+              ) : null}
+              <button
+                className="secondary"
+                disabled={busy || selected.length === 0}
+                onClick={() =>
+                  void act(async () => {
+                    const result = await api<{ scenarios: SavedScenario[] }>(
+                      '/v1/trips/' + active.id + '/compare',
+                      'POST',
+                      { scenarioIds: selected },
+                    );
+                    setComparison(result.scenarios);
+                  })
+                }
               >
-                <table>
-                  <caption>
-                    Possibilidades para sua viagem · valores simulados
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th>Componente</th>
-                      {comparison.map((s) => (
-                        <th key={s.id}>{s.title}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(
-                      [
-                        ['flights', 'Passagens'],
-                        ['hotels', 'Hospedagem'],
-                        ['food', 'Alimentação'],
-                        ['transport', 'Transporte'],
-                        ['activities', 'Passeios'],
-                        ['doorToDoor', 'Porta a porta'],
-                        ['total', 'Total'],
-                      ] as const
-                    ).map(([key, label]) => (
-                      <tr key={key}>
-                        <th>{label}</th>
+                Comparar selecionados ({selected.length}/3)
+              </button>
+              {comparison.length > 0 ? (
+                <div
+                  className="comparison"
+                  role="region"
+                  aria-label="Comparação de cenários"
+                >
+                  <table>
+                    <caption>
+                      Possibilidades para sua viagem · valores simulados
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th>Componente</th>
                         {comparison.map((s) => (
-                          <td key={s.id}>{money(s.snapshot.costs[key])}</td>
+                          <th key={s.id}>{s.title}</th>
                         ))}
                       </tr>
-                    ))}
-                    <tr>
-                      <th>Score orçamento</th>
-                      {comparison.map((s) => (
-                        <td key={s.id}>{s.snapshot.score}</td>
+                    </thead>
+                    <tbody>
+                      {(
+                        [
+                          ['flights', 'Passagens'],
+                          ['hotels', 'Hospedagem'],
+                          ['food', 'Alimentação'],
+                          ['transport', 'Transporte'],
+                          ['activities', 'Passeios'],
+                          ['doorToDoor', 'Porta a porta'],
+                          ['total', 'Total'],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <tr key={key}>
+                          <th>{label}</th>
+                          {comparison.map((s) => (
+                            <td key={s.id}>{money(s.snapshot.costs[key])}</td>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-      </section>
+                      <tr>
+                        <th>Score orçamento</th>
+                        {comparison.map((s) => (
+                          <td key={s.id}>{s.snapshot.score}</td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+        </section>
+      ) : (
+        <section
+          className="account-shell guest-shell"
+          aria-label="Acesso ao planejamento"
+        >
+          <div className="account-toolbar">
+            <div>
+              <strong>Explore sem cadastro</strong>
+              <p className="fine">
+                Encontre datas e custos livremente. Crie sua conta para salvar e
+                gerenciar viagens.
+              </p>
+            </div>
+            <div className="inline-actions">
+              <button
+                className="text-button"
+                disabled={loading}
+                onClick={() => requestAccount()}
+              >
+                Entrar
+              </button>
+              <button
+                className="secondary"
+                disabled={loading}
+                onClick={() => requestAccount(true)}
+              >
+                Criar conta
+              </button>
+            </div>
+          </div>
+          {error ? (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </section>
+      )}
       <Planner
-        key={(active?.id ?? 'new') + ':' + (editing?.id ?? 'plan')}
+        key={
+          plannerVersion +
+          ':' +
+          (active?.id ?? 'new') +
+          ':' +
+          (editing?.id ?? 'plan')
+        }
         trip={active}
         editing={editing}
         onSave={save}
+        signedIn={session !== null}
+        accountLoading={loading}
+        onRequireAccount={() => requestAccount()}
       />
     </>
   );

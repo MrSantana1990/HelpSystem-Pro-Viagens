@@ -46,7 +46,13 @@ export function Planner({
   trip,
   editing,
   onSave,
+  signedIn,
+  accountLoading,
+  onRequireAccount,
 }: {
+  signedIn: boolean;
+  accountLoading: boolean;
+  onRequireAccount: () => void;
   trip: TripDetail | null;
   editing: SavedScenario | null;
   onSave: (
@@ -314,14 +320,24 @@ export function Planner({
               <button
                 className="secondary save-plan"
                 type="button"
-                onClick={() => void save()}
+                disabled={accountLoading}
+                onClick={() => (signedIn ? void save() : onRequireAccount())}
               >
-                {editing
-                  ? 'Atualizar cenário'
-                  : selected
-                    ? 'Salvar viagem e cenário'
-                    : 'Salvar viagem'}
+                {!signedIn
+                  ? 'Salvar meu planejamento'
+                  : editing
+                    ? 'Atualizar cenário'
+                    : selected
+                      ? 'Salvar viagem e cenário'
+                      : 'Salvar viagem'}
               </button>
+              {!signedIn ? (
+                <p className="fine">
+                  Para salvar e gerenciar suas viagens, entre ou crie uma conta.
+                  Seu planejamento fica nesta página enquanto ela estiver
+                  aberta.
+                </p>
+              ) : null}
               {saved ? (
                 <p role="status" className="success">
                   {saved}

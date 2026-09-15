@@ -1,37 +1,26 @@
-# Ambientes e credenciais — Fase 1 local
+﻿# Ambientes e credenciais
 
-## Configuração real
+## Staging
 
-npm run local:setup gera .env apenas se ausente, com três senhas criptograficamente aleatórias independentes. Não sobrescreve configuração existente. Linux: modo 600; Windows: ACL somente para o usuário atual. Nunca imprimir .env, strings de conexão ou Compose expandido com secrets.
+Diretório exclusivo /opt/projetos/helpsystempro-viagens/staging. Compose viagens-staging; porta HTTPS 127.0.0.1:18094; API/PostgreSQL sem portas no host. Redes viagens-staging_private (internal) e viagens-staging_edge; volumes postgres_data/backup_data próprios. Redis não iniciado.
 
-| Variável               | Responsabilidade                                              |
-| ---------------------- | ------------------------------------------------------------- |
-| POSTGRES_PASSWORD      | Bootstrap/admin local e backup; nunca na API                  |
-| MIGRATION_PASSWORD     | Role viagens_migrator; apenas migration                       |
-| RUNTIME_PASSWORD       | Role viagens_runtime; somente DML/autenticação/RLS            |
-| DATABASE_URL           | Conexão runtime; injetada por Compose no serviço API          |
-| MIGRATION_DATABASE_URL | Conexão DDL; injetada somente no serviço migrate              |
-| APP_ENV                | local, staging, production; esta fase executa somente local   |
-| APP_ORIGINS            | Lista explícita de origens completas; sem wildcard            |
-| HOST/PORT              | API nativa; padrão loopback:3001, Docker 0.0.0.0:3001 interno |
-| WEB_PORT               | Host loopback, 8094 no desenvolvimento                        |
-| PROVIDER_MODE          | Somente demo                                                  |
-| REDIS_PASSWORD         | Apenas perfil futuro; Redis não usado por sessões             |
+runtime.env root:root 600 possui POSTGRES_PASSWORD, MIGRATION_PASSWORD e RUNTIME_PASSWORD aleatórias independentes. O provisionador preserva valores existentes; alterar arquivo não rotaciona roles automaticamente. A API recebe somente a credencial runtime. TLS/CA e conta sintética de smoke ficam em arquivos próprios, fora do Git. Chave TLS do web 400 para UID 101; chave da CA 600 root; certificados públicos 444.
 
-Senhas geradas são hexadecimais, seguras para interpolação em URL. Credenciais fornecidas manualmente precisam de URL encoding; preferir o gerador local. Uma mudança no .env não rotaciona automaticamente usuários de um volume PostgreSQL já inicializado: fazer rotação explícita e coordenada das roles antes de alterar a configuração de runtime.
+GitHub Environment staging contém somente DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY e DEPLOY_KNOWN_HOSTS. STAGING_DEPLOY_ENABLED=true é variável do repositório; a chamada passa por Quality. Production tem DEPLOY_ENABLED=false, revisão obrigatória e nenhuma chave de deploy configurada. Branches autorizadas em staging: main e a branch temporária agent/staging-provisioning-cd.
 
-## Ambientes de execução
+Fingerprint SSH ED25519 conferido pelo canal administrativo já confiável e pelo known_hosts local: SHA256:M3Gy4Ud27K2uNeeZUhpaUrYXff+nLZEDTv80PIKDDRk. Não usar ssh-keyscan como aprovação automática de chave nova; não desabilitar StrictHostKeyChecking.
 
-Principal: viagens-local, volumes PostgreSQL/backup próprios, nenhuma porta do banco no host. npm run local:up exige Docker e realiza backup antes da migration. Use volumes novos ou migração deliberada ao incorporar esta fase em uma instalação manual anterior; não reusar bancos de outros produtos.
+Usuários:
 
-Testes: viagens-phase1-test-PID com .runtime/arquivo.env protegido, bancos/volumes descartáveis e portas apenas loopback 15495/18095. test:system gera e injeta DATABASE_URL, MIGRATION_DATABASE_URL, TEST_ADMIN_URL e TEST_DATABASE_CONTAINER para a suíte; não copiar esses valores para configuração principal. RUN_DATABASE_TESTS é obrigatório; o comando isolado recusa executar sem ambiente preparado.
+- viagens-deploy: somente grupo próprio, authorized_keys root-owned, forced command; única regra sudo para helper fixo. Sem grupo docker, shell remoto, PTY ou forwarding.
+- viagens-access: somente grupo próprio, sem sudo/Docker; chave exclusiva para encaminhar a porta privada. Não recebe secrets de deploy.
 
-Desenvolvimento frontend: npm run dev:web, com proxy API para localhost:3001. API nativa requer PostgreSQL próprio acessível localmente, migrations aplicadas e DATABASE_URL runtime exportada; o modo Docker completo é o caminho documentado para esta fase. npm run dev não substitui a configuração do banco e não carrega .env automaticamente.
+Chaves locais em ~/.ssh/viagens_staging_deploy e ~/.ssh/viagens_staging_access, com ACL do usuário atual. Nunca publicar arquivos privados, runtime.env, smoke-config.js, dumps ou manual global.
 
-## Credenciais externas
+## Local e testes
 
-Nenhuma necessária para concluir a Fase 1. GitHub já autenticado. Não acessar VPS, Cloudflare, fornecedores, e-mail ou outros produtos.
+npm run local:setup gera .env protegido apenas se ausente; npm run local:up mantém http://localhost:8094. DATABASE_URL é runtime, MIGRATION_DATABASE_URL é DDL. APP_ENV local permite HTTP; staging/production exigem APP_ORIGINS HTTPS e cookies Secure. PROVIDER_MODE continua demo.
 
-Próxima fase: credencial de deploy restrita, fingerprint SSH validado, environments GitHub e destino offsite autenticado. DEPLOY_ENABLED e PERSISTENCE_DEPLOY_READY devem continuar desabilitados até resolver esses gates. Não reaproveitar automaticamente chave administrativa ou contas de banco existentes.
+npm run test:system usa projeto viagens-phase1-test-PID e bancos/volumes descartáveis, com loopback 15495/18095. Não reutiliza staging nem o banco local principal. RUN_DATABASE_TESTS é obrigatório para a suíte isolada.
 
-Os templates staging/production são planejamento herdado, não ambientes provisionados. Em APP_ENV não-local, todas as origens devem ser HTTPS e os cookies serão Secure.
+Nenhum provider comercial, e-mail ou credencial de outro produto foi integrado. Offsite depende de destino e autenticação próprios antes de produção.

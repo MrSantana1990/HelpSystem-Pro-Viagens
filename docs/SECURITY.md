@@ -1,4 +1,4 @@
-# Segurança — identidade e persistência local
+# Segurança — identidade, persistência e staging privado
 
 ## Senhas e enumeração
 
@@ -30,8 +30,24 @@ React escapa títulos/conteúdo; sem HTML arbitrário. Nginx mantém CSP, nosnif
 
 PostgreSQL/Redis sem porta pública, API em rede interna; somente web em loopback. Aplicação não-root; limites de memória e logs. Redis/worker não são iniciados sem necessidade.
 
-Backups contêm dados sensíveis: diretório 700, dumps/checksums 600, volume isolado. Restore permitido somente em banco descartável recém-criado no projeto de teste. Offsite autenticado, retenção real e ensaio operacional com volume representativo são gates para staging/persistência compartilhada. pg_dump não inclui roles: recriá-las pelo provisionamento antes de restaurar em cluster novo.
+Backups contêm dados sensíveis: diretório 700, dumps/checksums 600, volume isolado. Restore permitido somente em banco descartável recém-criado: projeto de teste local ou cluster exclusivo do staging pelo helper administrativo. Offsite autenticado e ensaio operacional com volume representativo são gates de produção; o Prompt 3 autoriza staging privado sem offsite. pg_dump não inclui roles: recriá-las pelo provisionamento antes de restaurar em cluster novo.
 
 Sem verificação de e-mail, recuperação de conta, troca de senha ou gestão B2B nesta fase. Nenhuma integração comercial, compra, e-mail, PWA offline, DNS ou produção. Branch e PR sujeitos à revisão.
 
 A matriz de testes e os resultados reais estão em [VALIDATION](VALIDATION.md); critérios e fontes da decisão em [ADR 004](adr/004-runtime-identity-and-backup.md).
+
+## Staging privado — Fase 2 operacional
+
+Identidade SSH de deploy exclusiva e limitada a helper root-owned; não pertence ao grupo docker. Pacote de imagens limita tamanho, plataforma, nomes e SHA, incluindo índice OCI; nenhuma extração no filesystem do host. O servidor exige Quality do workflow conhecido, para push em branch autorizada e commit exato. Templates privilegiados ficam fora de releases. Alterações administrativas exigem revisão; código da aplicação implantado pode acessar os dados do próprio produto.
+
+runtime.env/smoke-config.js 600 root, chave CA 600 root, chave TLS 400 UID do web; secrets mínimos somente no Environment staging. Known_hosts validado, StrictHostKeyChecking=yes. Chave de acesso privada separada com forwarding limitado à porta 18094; sem alteração DNS/Tunnel. TLS termina no Nginx exclusivo com CA própria; não desabilitar validação TLS globalmente. Cookies __Host-/Secure permanecem ativos.
+
+main exige PR e quality, impede force push/deleção. A contagem de aprovações de PR é zero para o mantenedor único, sem dispensar PR/check; production exige revisão no Environment e permanece sem deploy habilitado. A autorização temporária de bootstrap deve ser removida após integração.
+
+Rate limit continua agregado atrás do Nginx, trustProxy permanece desabilitado: adequado ao staging privado pequeno, sem confiar em cabeçalhos arbitrários. Antes de tráfego público, revisar proxy confiável e limites distribuídos. Offsite agora é gate de produção; o Prompt 3 autoriza staging técnico privado sem esse destino. Logs e artefatos não contêm credenciais/dumps. Detalhes e alternativas no ADR 005.
+
+O pacote é vinculado criptograficamente ao SHA-256 registrado no nome do artefato do job Quality no GitHub, consultado pelo servidor via HTTPS. A validação não depende apenas de tags/labels fornecidas pelo cliente de deploy.
+
+## Visitantes
+
+Exploração de datas/custos sem cadastro não concede acesso a viagens salvas. Auth/CSRF/RLS de endpoints privados permanecem inalterados. A consulta inicial de sessão sem identidade não emite um evento falso de expiração nem apaga o rascunho público. Logout/expiração reais removem estado privado e reiniciam o Planner; entrar a partir de um rascunho público o preserva na memória da mesma página. Diálogo nativo mantém foco e permite voltar à exploração. Nenhum novo cookie/token ou armazenamento local é criado para visitantes.

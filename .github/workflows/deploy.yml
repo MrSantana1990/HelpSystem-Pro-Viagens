@@ -1,44 +1,39 @@
-name: Deploy isolated environment
+﻿name: Deploy private staging
 on:
   workflow_call:
     inputs:
-      target:
+      image-artifact:
         required: true
         type: string
 permissions:
   contents: read
 concurrency:
-  group: deploy-${{ inputs.target }}
+  group: viagens-staging-deploy
   cancel-in-progress: false
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.target }}
-    env:
-      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-      DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-      TARGET: ${{ inputs.target }}
-      REVISION: ${{ github.sha }}
+    environment: staging
     steps:
       - uses: actions/checkout@v4
-      - name: Configure dedicated SSH identity
-        shell: bash
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.image-artifact }}
+          path: .runtime
+      - name: Deploy verified commit through restricted identity
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          REVISION: ${{ github.sha }}
         run: |
           set -euo pipefail
-          test -n "$DEPLOY_HOST" && test -n "$DEPLOY_USER" && test -n "$DEPLOY_KEY" && test -n "$DEPLOY_KNOWN_HOSTS"
           install -d -m 700 ~/.ssh
-          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
-      - name: Deploy verified commit
-        shell: bash
-        run: |
-          set -euo pipefail
-          [[ "$TARGET" =~ ^(staging|production)$ ]]
-          [[ "$REVISION" =~ ^[a-f0-9]{40}$ ]]
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" bash -s -- "$TARGET" "$REVISION" < infra/deploy.sh
-      - name: Remove runner SSH identity
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/viagens_staging
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/viagens_known_hosts
+          chmod 600 ~/.ssh/viagens_staging ~/.ssh/viagens_known_hosts
+          bash infra/deploy.sh staging "$REVISION" .runtime/release.tar
+      - name: Remove runner identity
         if: always()
-        run: rm -f ~/.ssh/id_ed25519
+        run: rm -f ~/.ssh/viagens_staging ~/.ssh/viagens_known_hosts

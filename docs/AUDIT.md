@@ -44,3 +44,13 @@ Não reutilizar scraping com perfis de navegador: os incidentes anteriores mostr
 Aprovação comercial e quotas dos fornecedores podem impedir cotações reais. Estimativas não incluem toda despesa individual. Score v0 não mede qualidade global da viagem. VPS compartilhada tem capacidade variável. TLS/DNS de Viagens e restauração de backups ainda não validados. Autenticação, consentimento, retenção e autorização por usuário são pré-requisitos de persistência pública.
 
 Fontes externas consultadas: [Node Release](https://github.com/nodejs/Release), [Vite](https://vite.dev/guide/), [Skyscanner Travel API](https://www.partners.skyscanner.net/product/travel-api), [Booking prerequisites](https://developers.booking.com/demand/docs/getting-started/prerequisites). Node 22 ainda está em manutenção LTS; Vite aceita Node 22.12+. As duas integrações de viagem exigem onboarding próprio, não apenas a presença de um conector nesta sessão.
+
+## Revalidação da VPS — 10/09/2026, 11:17 UTC
+
+Nova consulta SSH antes de provisionar Viagens: RAM total 7.941 MiB, disponível 4.730 MiB, swap 4.095 MiB (1 MiB usado), disco 86 GB livres, load average 1,74/1,03/0,92. Docker 29.1.3 e Compose 2.40.3 disponíveis. Porta 18094 livre, sem projeto/volume/rede Viagens remoto preexistente.
+
+Portal, Crédito, CareerOS e Bot: origens loopback 8092/8091/8093/8501 responderam 200/200/308/200. Containers com health declarado estavam saudáveis; workers/scheduler e componentes AEG/Alerta sem health declarado estavam em execução. Docker e cloudflared ativos; Nginx global via systemd inativo, bordas existentes operam em containers. Portas 80/443/8443 pertencem a outros produtos. Chromium, MySQL, Redis e workers externos ao escopo foram somente observados.
+
+Tunnel auditado por entradas hostname/service: somente Portal, Crédito, CareerOS e fallback 404; nenhum hostname Viagens criado. Um novo hostname exigiria adicionar ingresso e DNS após backup/revisão, podendo afetar o Tunnel compartilhado; a fase usa SSH e não fez essa mudança. Offsite não identificado nos executáveis rclone/restic/borg/aws, timers e caminhos de configuração verificados. Inventário não prova inexistência de contas externas fora desses locais.
+
+A provisão utiliza somente /opt/projetos/helpsystempro-viagens, usuários/chaves próprios e arquivos de serviço Viagens. Não executou prune global, restart do Docker/SSH/cloudflared, alteração de DNS ou comandos de controle em outros produtos. Evidência final de health/recuperação em VALIDATION.
